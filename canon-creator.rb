@@ -20,12 +20,12 @@ end
 
   # make a structure, 4 bars long
 
-  struct = {type: "round", num_bars: 4, time_sig: [4,4],
+  canon = {type: "round", num_bars: 4, time_sig: [4,4],
             bars: [
-              {num_notes: 4, notes: [{pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}]},
-              {num_notes: 4, notes: [{pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}]},
-              {num_notes: 4, notes: [{pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}]},
-  {num_notes: 4, notes: [{pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}, {pitch: fresh, duration: fresh}]}]}
+              {num_notes: 4, notes: [{pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 1}, {pitch: fresh, duration: 2}]},
+              {num_notes: 4, notes: [{pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 1}, {pitch: fresh, duration: 2}]},
+              {num_notes: 4, notes: [{pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 1}, {pitch: fresh, duration: 2}]},
+  {num_notes: 4, notes: [{pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 0.5}, {pitch: fresh, duration: 1}, {pitch: fresh, duration: 2}]}]}
 
   # add some basic constraints
 
@@ -74,18 +74,7 @@ end
         for j in 0..bar2[:num_notes] - 1
           if (start_time_2 >= start_time && start_time_2 < end_time)
             # DOES overlap
-            conde_clauses << conde(
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] + 3),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] - 3),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] + 4),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] - 4),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] + 5),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] - 5),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] + 6),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] - 6),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] + 7),
-              eq(bar1[:notes][i][:pitch], bar2[:notes][j][:pitch] - 7)
-              )
+            conde_clauses << eq(bar1[:notes][i][:pitch] + 4, bar2[:notes][j][:pitch])
           end
           start_time_2 += bar2[:notes][j][:duration]
         end
@@ -98,33 +87,34 @@ end
 
   constraints = []
 
-  constraints << specific_note(struct, 0, 0, note(:c))
-  constraints << specific_note(struct, 1, 1, note(:g))
-  constraints << specific_note(struct, 2, 2, note(:a))
+  # bar one: get a random melody, with constraints that first note is :c
+    bar1 = canon[:bars][0]
 
-  for i in 0..struct[:num_bars] - 1
-    current_bar = struct[:bars][i]
-    for j in 0..current_bar[:num_notes] - 1
-      constraints << in_key_of_c(current_bar[:notes][j][:pitch])
-      constraints << is_some_duration(current_bar[:notes][j][:duration])
-    end
-  end
+    constraints << specific_note(canon, 0, 0, note(:c))
 
-  constraints << canon_round(struct[:bars][0], struct[:bars][1])
-  constraints << canon_round(struct[:bars][1], struct[:bars][2])
-  constraints << canon_round(struct[:bars][2], struct[:bars][3])
+    constraints << is_next_to(bar1[:notes][0][:pitch], bar1[:notes][1][:pitch], 4)
+    constraints << is_next_to(bar1[:notes][1][:pitch], bar1[:notes][2][:pitch], 4)
+    constraints << is_next_to(bar1[:notes][2][:pitch], bar1[:notes][3][:pitch], 4)
 
-  for i in 0..struct[:num_bars] - 1
-    current_bar = struct[:bars][i]
-    for j in 0..current_bar[:num_notes] - 2
-      constraints << adds_up_to(current_bar, 4)
-      constraints << is_next_to(current_bar[:notes][j][:pitch], current_bar[:notes][j + 1][:pitch], 5)
-    end
-  end
+  # bar two: make it fit with bar one
+  bar2 = canon[:bars][1]
+
+  constraints << canon_round(bar1, bar2)
+
+  # bar three
+  bar3 = canon[:bars][2]
+
+  constraints << canon_round(bar2, bar3)
+
+  # bar four
+  bar4 = canon[:bars][3]
+
+  constraints << canon_round(bar3, bar4)
+
 
   # run it!
   q = fresh
-  run(1, q, eq(q, struct), *constraints)
+  run(1, q, eq(q, canon), *constraints)
 
 end
 
