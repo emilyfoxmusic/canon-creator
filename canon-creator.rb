@@ -14,9 +14,9 @@ length_of_canon = 3 # TODO: implement from this
 ################ SYSTEM PARAMETERS ################
 P_SINGLE = 0.25
 P_DOUBLE = 0.25
-P_TRIPLE = 0.4
-P_QUADRUPLE = 1
-P_QUINTUPLE = 0.05
+P_TRIPLE = 0.2
+P_QUADRUPLE = 0.1
+P_QUINTUPLE = 1
 ###################################################
 
 # Hard code it for now...
@@ -181,7 +181,11 @@ canon_results = MiniKanren.exec do
   end
 
   def transform_beat_quintuple(beat, next_beat)
-    # TODO
+    # Constrain the rhythm
+    $constraints << eq(beat[:rhythm], [0.25, 0.25, 0.25, 0.125, 0.125])
+
+    # One simple pattern for now TODO: actually do this properly
+    $constraints << eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), get_note_at_offset(beat[:root_note], 2), get_note_at_offset(beat[:root_note], 1), beat[:root_note]])
   end
 
   #######################################################
