@@ -13,8 +13,8 @@ length_of_canon = 3 # TODO: implement from this
 ###################################################
 ################ SYSTEM PARAMETERS ################
 P_SINGLE = 0.5
-P_DOUBLE = 1
-P_TRIPLE = 0.25
+P_DOUBLE = 0.25
+P_TRIPLE = 1
 P_QUADRUPLE = 0.25
 P_QUINTUPLE = 0.05
 ###################################################
@@ -106,8 +106,6 @@ canon_results = MiniKanren.exec do
       $constraints << eq(beat[:notes], [beat[:root_note], beat[:root_note]]) # TODO: fix this so that it does something more interesting!
     else
       # The first note must be the root of this beat
-      notes = [beat[:root_note], nil]
-
       # The second note should lead into the next note
       options_for_second_note = get_passing_note(beat[:root_note], next_beat[:root_note])
 
@@ -120,7 +118,38 @@ canon_results = MiniKanren.exec do
   end
 
   def transform_beat_triple(beat, next_beat)
-    # TODO
+    # Split the beat into three, 3 cases
+    cases = [[eq(beat[:rhythm], [0.25, 0.25, 0.5])],
+    [eq(beat[:rhythm], [0.5, 0.25, 0.25])],
+    [eq(beat[:rhythm], [Rational(1, 3), Rational(1, 3), Rational(1, 3)])]]
+
+    # CASE 1: The first and third note must be the root of this beat and the middle one an adjacent note
+    cases[0] << conde(
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), beat[:root_note]]))
+
+    # CASE 2 and 3: The first must be the root of this beat and either:
+    options = []
+    # Only valid if this is not the last note of the piece
+    if !next_beat == []
+      ## second also the root note and third a passing note TODO: (not the same one as the root)
+      options << eq(beat[:notes], [beat[:root_note], beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note])])
+    end
+
+    ## third is root note and the second is an adjacent one
+    options << conde(
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), beat[:root_note]]))
+
+    ## TODO: neither second or third are root notes but 'walk' to the next note
+
+    cases[1] << conde(*options)
+    cases[2] << conde(*options)
+
+    cases.map! do
+      |x| all(*x)
+    end
+    $constraints << conde(*cases)
   end
 
   def transform_beat_quadruple(beat, next_beat)
@@ -171,5 +200,5 @@ canon_results = MiniKanren.exec do
   run(q, eq(q, canon), *$constraints)
 end
 
-puts canon_results.length
-print canon_results[1]
+print canon_results
+#print canon_results[canon_results.length / 2 -4]
