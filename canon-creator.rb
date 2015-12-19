@@ -12,10 +12,10 @@ number_of_voices = 3 # TODO: implement from this
 length_of_canon = 3 # TODO: implement from this
 ###################################################
 ################ SYSTEM PARAMETERS ################
-P_SINGLE = 0.5
+P_SINGLE = 0.25
 P_DOUBLE = 0.25
-P_TRIPLE = 1
-P_QUADRUPLE = 0.25
+P_TRIPLE = 0.4
+P_QUADRUPLE = 1
 P_QUINTUPLE = 0.05
 ###################################################
 
@@ -153,7 +153,31 @@ canon_results = MiniKanren.exec do
   end
 
   def transform_beat_quadruple(beat, next_beat)
-    # TODO
+    # Split the note into 4
+    $constraints << eq(beat[:rhythm], [0.25, 0.25, 0.25, 0.25])
+
+    # The first note must be the root
+    options = []
+    # One other must be the root
+    ## Second TODO: make the next ones 'walk'
+
+    ## Third. Second must be adjacent and fourth is leading to the next. Only valid if not the final note of the melody.
+    if next_beat != nil
+      options << conde(
+      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note])]),
+      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note])]))
+    end
+
+    ## Fourth. Second and third are each side, or on the same side (either one)
+    options << conde(
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), get_note_at_offset(beat[:root_note], 2), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), get_note_at_offset(beat[:root_note], - 2), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 2), get_note_at_offset(beat[:root_note], 1), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 2), get_note_at_offset(beat[:root_note], - 1), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], + 1), get_note_at_offset(beat[:root_note], - 1), beat[:root_note]]),
+    eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), get_note_at_offset(beat[:root_note], + 1), beat[:root_note]]))
+
+    $constraints << conde(*options)
   end
 
   def transform_beat_quintuple(beat, next_beat)
@@ -197,8 +221,9 @@ canon_results = MiniKanren.exec do
 
   # run the query using q, a fresh query variable
   q = fresh
-  run(q, eq(q, canon), *$constraints)
+  run(100, q, eq(q, canon), *$constraints)
 end
 
-print canon_results
-#print canon_results[canon_results.length / 2 -4]
+len = canon_results.length
+print canon_results[98]
+puts " "
