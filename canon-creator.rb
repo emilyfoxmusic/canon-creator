@@ -33,7 +33,7 @@ end
 
 canon_results = MiniKanren.exec do
 
-  ###### DEFINE FUNCTIONS ######
+  ################### DEFINE FUNCTIONS ###################
 
   # Given two notes in the scale, find the median between them (rounded down if the median is between two values)
   def find_median_note(note, next_note)
@@ -73,18 +73,7 @@ canon_results = MiniKanren.exec do
     end
   end
 
-  ##############################
-
-  # Make the notes into fresh variables
-  for i in 0..canon.length - 1
-    for j in 0..canon[i].length - 1
-      canon[i][j][:rhythm] = fresh
-      canon[i][j][:notes] = fresh
-    end
-  end
-
-  # Initialise the constraints
-  $constraints = []
+  ############## TRANSFORMATION FUNCTIONS ################
 
   # For each beat, unify with a suitable sub-melody by defining functions which unify notes and rhythms to it
   def transform_beat(beat, next_beat)
@@ -129,6 +118,31 @@ canon_results = MiniKanren.exec do
       $constraints << conde(*options_for_both_notes)
     end
   end
+
+  def transform_beat_triple(beat, next_beat)
+    # TODO
+  end
+
+  def transform_beat_quadruple(beat, next_beat)
+    # TODO
+  end
+
+  def transform_beat_quintuple(beat, next_beat)
+    # TODO
+  end
+
+  #######################################################
+
+  # Make the notes into fresh variables
+  for i in 0..canon.length - 1
+    for j in 0..canon[i].length - 1
+      canon[i][j][:rhythm] = fresh
+      canon[i][j][:notes] = fresh
+    end
+  end
+
+  # Initialise the constraints
+  $constraints = []
 
   # Transform all the beats
   for i in 0..canon.length - 1
