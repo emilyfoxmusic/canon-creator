@@ -25,11 +25,12 @@ def play_canon(canon, voices)
     puts "Warning: empty canon given."
   else
     num_beats = canon[0][0].length
-    for i in 0..voices - 1
-      sleep i * num_beats
+    voices.times do
+      puts "new"
       in_thread do
         play_melody(canon)
       end
+      sleep num_beats
     end
   end
 end
