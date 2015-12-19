@@ -39,3 +39,7 @@ Add constraints to each bar in sequence so that backtracking is not looking at t
 3. Repeat
 
 This could be done durations first, then pitches afterwards, or all at the same time. The former would imply there is no relation between the durations and the pitches, the latter might mean I am able to do more compex things.
+
+##### Change of direction
+
+That approach was bearing no fruit so now I am trying a new one. This is using more music theory to do- from chords rather than anything else.
