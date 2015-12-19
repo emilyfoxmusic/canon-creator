@@ -19,6 +19,7 @@ P_QUADRUPLE = 0.25
 P_QUINTUPLE = 0.05
 ###################################################
 
+# Hard code it for now...
 root_notes = [[:g, :c, :d], [:e, :f, :b], [:c, :f, :g]]
 
 # Generate the canon structure
@@ -32,23 +33,47 @@ end
 
 canon_results = MiniKanren.exec do
 
-  #scale = [:c, :d, :e, :f, :g, :a, :b] # TODO: fix this
+  ###### DEFINE FUNCTIONS ######
 
-  def find_median_note(scale, note, next_note)
-    index_of_note = scale.index(note)
-    index_of_next_note = scale.index(next_note)
+  # Given two notes in the scale, find the median between them (rounded down if the median is between two values)
+  def find_median_note(note, next_note)
+    index_of_note = $scale.index(note)
+    index_of_next_note = $scale.index(next_note)
 
     mod_diff = (index_of_note - index_of_next_note).abs
 
-    if mod_diff > scale.length / 2
+    if mod_diff > $scale.length / 2
       if index_of_note < index_of_next_note
         index_of_note += scale.length
       else
-        index_of_next_note += scale.length
+        index_of_next_note += $scale.length
       end
     end
-    scale[(((index_of_note + index_of_next_note) / 2).floor)]
+    $scale[(((index_of_note + index_of_next_note) / 2).floor)]
   end
+
+  # Given a note in the scale, return the note at an offset within the scale
+  def get_note_at_offset(note, offset)
+    $scale[($scale.index(note) + offset) % $scale.length]
+  end
+
+  # Given two notes, find a good passing note between them
+  def get_passing_note(note_1, note_2)
+    # Are they adjacent notes in the scale?
+    diff = $scale.index(note_1) - $scale.index(note_2)
+    if (diff == 1 || diff == $scale.length - 1)
+      # If they are adjacent, choose either root note, one higher, or a two lower
+      [note_1, note_2, get_note_at_offset(note_1, + 1), get_note_at_offset(note_1, - 2)]
+    elsif (diff == -1 || diff == -($scale.length - 1))
+      # If they are adjacent, choose either root note, one lower, or a two higher
+      [note_1, note_2, get_note_at_offset(note_1, - 1), get_note_at_offset(note_1, + 2)]
+    else
+      # If they are not adjacent, find the median
+      [find_median_note(note_1, note_2)]
+    end
+  end
+
+  ##############################
 
   # Make the notes into fresh variables
   for i in 0..canon.length - 1
@@ -88,32 +113,20 @@ canon_results = MiniKanren.exec do
     $constraints << eq(beat[:rhythm], [0.5, 0.5])
 
     if (next_beat == nil)
+      # This is the last note of the piece
       $constraints << eq(beat[:notes], [beat[:root_note], beat[:root_note]]) # TODO: fix this so that it does something more interesting!
     else
-
       # The first note must be the root of this beat
       notes = [beat[:root_note], nil]
 
-      options = []
       # The second note should lead into the next note
-      # Are they adjacent notes in the scale?
-      diff = $scale.index(beat[:root_note]) - $scale.index(next_beat[:root_note])
-      if (diff == 1 || diff == $scale.length - 1)
-        # If they are adjacent, choose either root note, one higher, or a two lower
-        options = [beat[:root_note], next_beat[:root_note], $scale[($scale.index(beat[:root_note]) + 1) % $scale.length], $scale[($scale.index(beat[:root_note]) - 2) % $scale.length]]
-      elsif (diff == -1 || diff == -($scale.length - 1))
-        # If they are adjacent, choose either root note, one lower, or a two higher
-        options = [beat[:root_note], next_beat[:root_note], $scale[($scale.index(beat[:root_note]) - 1) % $scale.length], $scale[($scale.index(beat[:root_note]) + 2) % $scale.length]]
-      else
-        # If they are not adjacent, find the median
-        options = [find_median_note($scale, beat[:root_note], next_beat[:root_note])]
-      end
+      options_for_second_note = get_passing_note(beat[:root_note], next_beat[:root_note])
 
-      constraints = []
-      for i in 0..options.length - 1
-        constraints << eq(beat[:notes], [beat[:root_note], options[i]])
+      options_for_both_notes = []
+      for i in 0..options_for_second_note.length - 1
+        options_for_both_notes << eq(beat[:notes], [beat[:root_note], options_for_second_note[i]])
       end
-      $constraints << conde(*constraints)
+      $constraints << conde(*options_for_both_notes)
     end
   end
 
@@ -145,4 +158,4 @@ canon_results = MiniKanren.exec do
 end
 
 puts canon_results.length
-puts canon_results[canon_results.length / 2 - 10]
+print canon_results[1]
