@@ -4,21 +4,15 @@ require 'mini_kanren'
 
 ###################################################
 ################# USER PARAMETERS #################
-chord_sequence = [:c, :f, :g] # TODO: implement from this
-beats_for_each_chord = [1, 1, 1] # TODO: implement from this
-beats_per_bar = 3 # TODO: implement from this
-$scale_ring = [:c, :d, :e, :f, :g, :a, :b] # TODO: implement this with a ring?
-number_of_voices = 3 # TODO: implement from this
-length_of_canon = 3 # TODO: implement from this
+$scale_ring = scale(:c, :major)
 ###################################################
 ################ SYSTEM PARAMETERS ################
 P_SINGLE = 0.25
 P_DOUBLE = 0.25
-P_TRIPLE = 0.2
-P_QUADRUPLE = 0.1
+P_TRIPLE = 0.25
+P_QUADRUPLE = 0.2
 P_QUINTUPLE = 1
 ###################################################
-
 
 chords = MiniKanren.exec do
   extend SonicPi::Lang::Core
@@ -73,20 +67,26 @@ root_notes = Array.new(num_voices)
 for i in 0..root_notes.length - 1
   root_notes[i] = Array.new(chords.length)
   for j in 0..chords.length - 1
-    root_notes[i][j] = names_to_notes(chords[j], $scale_ring)
+    if (i == root_notes.length && j == root_notes[i].length)
+      root_notes[i][j] = $scale_ring[0]
+    else
+      root_notes[i][j] = names_to_notes(chords[j], $scale_ring)
+    end
   end
 end
 
 puts root_notes
 
 # Generate the canon structure
-canon = Array.new(length_of_canon)
+canon = Array.new(root_notes.length)
 for i in 0..canon.length - 1
-  canon[i] = Array.new(beats_per_bar)
-  for j in 0..beats_per_bar - 1
+  canon[i] = Array.new(root_notes[i].length)
+  for j in 0..root_notes[i].length - 1
     canon[i][j] = {root_note: root_notes[i][j], rhythm: nil, notes: nil}
   end
 end
+
+puts canon
 
 canon_results = MiniKanren.exec do
 
