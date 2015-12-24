@@ -19,8 +19,65 @@ P_QUADRUPLE = 0.1
 P_QUINTUPLE = 1
 ###################################################
 
+chords = MiniKanren.exec do
+  extend SonicPi::Lang::Core
+  # Generate the chord sequence.
+  ## Get time signature
+  time_sig = [[4,4], [3,4], [6,8]].choose
+
+  ## Get number of voices
+  case time_sig
+  when [4,4]
+    num_voices = rrand_i(1,4)
+  when [3,4]
+    num_voices = rrand_i(1,3)
+  when [6,8]
+    num_voices = 2
+  else
+    puts "Error: where did that time signature come from?!"
+  end
+
+  ## Get the chords
+  chord_choice = [:I, :IV, :V, :VI]
+  chords = Array.new(time_sig[0])
+  for i in 0..chords.length
+    chords[i] = {chord: fresh, duration: fresh}
+  end
+
+  chord_constraints = []
+
+  chord_constraints << eq(chords[chords.length - 1][:chord], :I)
+
+  for i in 0..chords.length - 2
+    chord_constraints << eq(chords[i][:chord], chord_choice.choose())
+  end
+  for i in 0..chords.length - 1
+    chord_constraints << conde(
+    eq(chords[i][:duration], 1),
+    eq(chords[i][:duration], 2)
+    )
+  end
+
+  ## Their durations must add up to one bar
+  chord_constraints << project(chords, lambda do |chords|
+    total = 0
+    for i in 0..chords.length - 1
+      sum += chords[i][:duration]
+    end
+    if sum == time_sig[0]
+      lambda { |x| x }
+    else
+      lambda { |x| nil }
+    end
+  end)
+
+  q = fresh
+  run(1, q, eq(q, chords), *chord_constraints)
+end
+
+
 # Hard code it for now...
-root_notes = [[:g, :c, :d], [:e, :f, :b], [:c, :f, :g]]
+root_notes = [[:g, :c, :g], [:e, :f, :e], [:c, :f, :c]]
 
 # Generate the canon structure
 canon = Array.new(length_of_canon)
@@ -44,7 +101,7 @@ canon_results = MiniKanren.exec do
 
     if mod_diff > $scale.length / 2
       if index_of_note < index_of_next_note
-        index_of_note += scale.length
+        index_of_note += $scale.length
       else
         index_of_next_note += $scale.length
       end
@@ -225,9 +282,9 @@ canon_results = MiniKanren.exec do
 
   # run the query using q, a fresh query variable
   q = fresh
-  run(100, q, eq(q, canon), *$constraints)
+  run(q, eq(q, canon), *$constraints)
 end
 
 len = canon_results.length
-print canon_results[98]
+print canon_results[20]
 puts " "
