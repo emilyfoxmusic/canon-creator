@@ -7,7 +7,7 @@ require 'mini_kanren'
 chord_sequence = [:c, :f, :g] # TODO: implement from this
 beats_for_each_chord = [1, 1, 1] # TODO: implement from this
 beats_per_bar = 3 # TODO: implement from this
-$scale = [:c, :d, :e, :f, :g, :a, :b] # TODO: implement this with a ring?
+$scale_ring = [:c, :d, :e, :f, :g, :a, :b] # TODO: implement this with a ring?
 number_of_voices = 3 # TODO: implement from this
 length_of_canon = 3 # TODO: implement from this
 ###################################################
@@ -18,6 +18,7 @@ P_TRIPLE = 0.2
 P_QUADRUPLE = 0.1
 P_QUINTUPLE = 1
 ###################################################
+
 
 chords = MiniKanren.exec do
   extend SonicPi::Lang::Core
@@ -46,13 +47,23 @@ chords = MiniKanren.exec do
   run(1, q, eq(q, chords), *chord_constraints)
 end
 
+chords = chords[0]
+
 # Get the root notes by choosing ones from the chords
-names_to_notes = {
-  :I => lambda { $scale[1], $scale[3], $scale[5]].choose },
-  :IV => lambda { [$scale[4], $scale[6], $scale[8]].choose },
-  :V => lambda { [$scale[5], $scale[7], $scale[9]].choose },
-  :VI => lambda { [$scale[6], $scale[8], $scale[10]].choose }
-}
+def names_to_notes(name, scale_ring)
+  case :I
+  when :I
+    [scale_ring[1], scale_ring[3], scale_ring[5]].choose
+  when :IV
+    [scale_ring[4], scale_ring[6], scale_ring[8]].choose
+  when :V
+    [scale_ring[5], scale_ring[7], scale_ring[9]].choose
+  when :VI
+    [scale_ring[6], scale_ring[8], scale_ring[10]].choose
+  else
+    puts "Error: no name matches!"
+  end
+end
 
 # Get number of voices
 num_voices = rrand_i(2,4)
@@ -60,9 +71,9 @@ num_voices = rrand_i(2,4)
 root_notes = Array.new(num_voices)
 
 for i in 0..root_notes.length - 1
-  root_notes = Array.new(chords.length)
+  root_notes[i] = Array.new(chords.length)
   for j in 0..chords.length - 1
-    root_notes[i][j] = names_to_notes[chords[j].call]
+    root_notes[i][j] = names_to_notes(chords[j], $scale_ring)
   end
 end
 
@@ -83,34 +94,34 @@ canon_results = MiniKanren.exec do
 
   # Given two notes in the scale, find the median between them (rounded down if the median is between two values)
   def find_median_note(note, next_note)
-    index_of_note = $scale.index(note)
-    index_of_next_note = $scale.index(next_note)
+    index_of_note = $scale_ring.index(note)
+    index_of_next_note = $scale_ring.index(next_note)
 
     mod_diff = (index_of_note - index_of_next_note).abs
 
-    if mod_diff > $scale.length / 2
+    if mod_diff > $scale_ring.length / 2
       if index_of_note < index_of_next_note
-        index_of_note += $scale.length
+        index_of_note += $scale_ring.length
       else
-        index_of_next_note += $scale.length
+        index_of_next_note += $scale_ring.length
       end
     end
-    $scale[(((index_of_note + index_of_next_note) / 2).floor)]
+    $scale_ring[(((index_of_note + index_of_next_note) / 2).floor)]
   end
 
   # Given a note in the scale, return the note at an offset within the scale
   def get_note_at_offset(note, offset)
-    $scale[($scale.index(note) + offset) % $scale.length]
+    $scale_ring[($scale_ring.index(note) + offset) % $scale_ring.length]
   end
 
   # Given two notes, find a good passing note between them
   def get_passing_note(note_1, note_2)
     # Are they adjacent notes in the scale?
-    diff = $scale.index(note_1) - $scale.index(note_2)
-    if (diff == 1 || diff == $scale.length - 1)
+    diff = $scale_ring.index(note_1) - $scale_ring.index(note_2)
+    if (diff == 1 || diff == $scale_ring.length - 1)
       # If they are adjacent, choose either root note, one higher, or a two lower
       [note_1, note_2, get_note_at_offset(note_1, + 1), get_note_at_offset(note_1, - 2)]
-    elsif (diff == -1 || diff == -($scale.length - 1))
+    elsif (diff == -1 || diff == -($scale_ring.length - 1))
       # If they are adjacent, choose either root note, one lower, or a two higher
       [note_1, note_2, get_note_at_offset(note_1, - 1), get_note_at_offset(note_1, + 2)]
     else
