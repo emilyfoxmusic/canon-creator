@@ -22,33 +22,22 @@ P_QUINTUPLE = 1
 chords = MiniKanren.exec do
   extend SonicPi::Lang::Core
   extend SonicPi::RuntimeMethods
-
-   # Generate the chord sequence.
+  # Generate the chord sequence.
   ## Get time signature
   time_sig = [[4,4], [3,4]].choose
-
-  ## Get number of voices
-  case time_sig
-  when [4,4]
-    num_voices = rrand_i(2,4)
-  when [3,4]
-    num_voices = rrand_i(2,3)
-  else
-    puts "Error: where did that time signature come from?!"
-  end
 
   ## Get the chords
   chord_choice = [:I, :IV, :V, :VI]
   chords = Array.new(time_sig[0])
-  for i in 0..chords.length
+  for i in 0..chords.length - 1
     chords[i] = fresh
   end
 
   chord_constraints = []
-  ### End on I
+  # End on I
   chord_constraints << eq(chords[chords.length - 1], :I)
 
-  ### For the rest, choose a chord at random
+  # For the rest, choose a chord at random
   for i in 0..chords.length - 2
     chord_constraints << eq(chords[i], chord_choice.choose())
   end
@@ -57,9 +46,27 @@ chords = MiniKanren.exec do
   run(1, q, eq(q, chords), *chord_constraints)
 end
 
+# Get the root notes by choosing ones from the chords
+names_to_notes = {
+  :I => lambda { $scale[1], $scale[3], $scale[5]].choose },
+  :IV => lambda { [$scale[4], $scale[6], $scale[8]].choose },
+  :V => lambda { [$scale[5], $scale[7], $scale[9]].choose },
+  :VI => lambda { [$scale[6], $scale[8], $scale[10]].choose }
+}
 
-# Hard code it for now...
-root_notes = [[:g, :c, :g], [:e, :f, :e], [:c, :f, :c]]
+# Get number of voices
+num_voices = rrand_i(2,4)
+
+root_notes = Array.new(num_voices)
+
+for i in 0..root_notes.length - 1
+  root_notes = Array.new(chords.length)
+  for j in 0..chords.length - 1
+    root_notes[i][j] = names_to_notes[chords[j].call]
+  end
+end
+
+puts root_notes
 
 # Generate the canon structure
 canon = Array.new(length_of_canon)
