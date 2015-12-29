@@ -43,3 +43,23 @@ This could be done durations first, then pitches afterwards, or all at the same 
 ##### Change of direction
 
 That approach was bearing no fruit so now I am trying a new one. This is using more music theory to do- from chords rather than anything else.
+
+#### December 24th 2015
+
+The new method of using music theory is working nicely. I've just finished a very rough version, I think from here on in, it's mainly cleaning things up and adding bits which make the canon sound nicer.
+
+##### Currently the software:
+
+* Generates and plays simple canons in 3/4 and 4/4.
+
+##### Things to do to improve:
+
+* Make sure that different bars do not have the same root note in the same place- this sounds bad...
+* Make the transforms nicer
+* Allow user inputs and transform so that it can work in the chained way (ask Sam)
+* Extend to compound time
+* Get different octaves to work
+
+##### Tasks that would be good to start soon:
+
+* Get it exporting to Lilypond and/or notation XML so that I can play it outside of Sonic Pi
