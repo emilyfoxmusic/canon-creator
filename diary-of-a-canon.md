@@ -44,7 +44,7 @@ This could be done durations first, then pitches afterwards, or all at the same 
 
 That approach was bearing no fruit so now I am trying a new one. This is using more music theory to do- from chords rather than anything else.
 
-#### December 24th 2015
+#### Date: December 24th 2015
 
 The new method of using music theory is working nicely. I've just finished a very rough version, I think from here on in, it's mainly cleaning things up and adding bits which make the canon sound nicer.
 
@@ -64,3 +64,36 @@ The new method of using music theory is working nicely. I've just finished a ver
 ##### Tasks that would be good to start soon:
 
 * Get it exporting to Lilypond and/or notation XML so that I can play it outside of Sonic Pi
+
+#### Date: December 30th 2015
+
+Yesterday I managed to do the exporting to Lilypond. Now I have a lot of tidying before I do much else. I think a lot of the code needs refactoring to make it nice. I want a vaguely polished version that I can call v1.0 today. Here I define v1.0.
+
+##### Version 1.0 of canon-creator
+
+##### Capabilities:
+
+* Time signatures: 3/4 and 4/4
+* Optional parameters:
+  - Key: note and major or minor
+  - Range of the piece: [*min*, *max*], *nil* for unspecified.
+  - Number of voices: up to three for 3/4 and four for 4/4
+  - Probabilities of each transform: [P1, P2, P3, P4, P5]
+  - Chord progression: array of the chord names <I, IV, V, VI> of length n where n is the number of beats in the bar. Generate a warning if the final one is not I - it will sound incomplete.
+* Sonic Pi plays the canons, with correct durations
+* Exports to Lilypond and user can choose to put all voices on the same stave, different staves, or just show a single melody.
+* Known issues that need sorting
+  - Octaves... Fix by specifying whole scale.
+  - Having the same notes for same chords makes it sound dodgy. Fix by adding logic constraints for these, and then picking one randomly afterwards.
+  - Thirds do not play properly. Fix by changing the player to use rationals.
+  - Add durations to Sonic Pi's playing of the canons.
+
+##### General tasks
+
+* Generate/ take in the scale.
+* Edit the canon structure to contain info- num of voices and time signature, more like the original plan.
+* Generate/ take in the chord progression.
+* Generate the notes to use in each chord (in later versions this can be specifiable).
+* Take the notes to proper melodies- 'add spice'. Take into account the user parameters.
+* Complete Sonic Pi player and Lilipond player.
+* Perhaps? Add Midi support. This can be done from Lilypond.
