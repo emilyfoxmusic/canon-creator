@@ -4,10 +4,10 @@ require 'mini_kanren'
 ################# USER PARAMETERS #################
 key = nil # [:c, :major]
 scale_range = nil # [:c3, :c6] # inclusive
-num_voices = 4
 time_sig = "4/4"
-probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
+num_voices = 4
 chord_progression = [:I, :IV, :V, :I]
+probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
 ###################################################
 
 ########### SYSTEM GENERATED PARAMETERS ###########
@@ -18,16 +18,29 @@ concrete_scale = nil
 # TODO: Check that notes given are valid, and return if they are not
 # TODO: Make whole thing into a procedure so that this is possible
 if (key != nil && key.length != 2) || (key != nil && key[0] == nil)
-  puts "Invalid input: key #{ key }"
+  puts "Invalid input: key #{ key }."
 end
 if scale_range != nil && scale_range.length != 2
-  puts "Invalid input: range #{ scale_range }"
+  puts "Invalid input: range #{ scale_range }."
 end
+if time_sig == "4/4" && num_voices > 4
+  puts "Invalid input: the number of voices cannot be more than 4 for a piece in 4/4 time."
+elsif time_sig == "3/4" && num_voices > 3
+  puts "Invalid input: the number of voices cannot be more than 3 for a piece in 3/4 time."
+elsif time_sig != "3/4" && time_sig != "4/4" && time_sig != nil
+  puts "Invalid time signature: #{ time_sig }."
+end
+# TODO: add validation to check that the chord progression has the right number of chords in
 ###################################################
 
-########## CONVERT SCALE RANGE TO NUMBERS #########
+################## PROCESS INPUT ##################
 if scale_range!= nil
   scale_range = [note(scale_range[0]), note(scale_range[1])]
+end
+if time_sig == "3/4"
+  time_sig = [3,4]
+elsif time_sig == "4/4"
+  time_sig = [4,4]
 end
 ###################################################
 
@@ -84,34 +97,30 @@ key = concrete_scale_data[:key]
 scale_range = concrete_scale_data[:scale_range]
 ###################################################
 
-chords = MiniKanren.exec do
-  extend SonicPi::Lang::Core
-  extend SonicPi::RuntimeMethods
-  # Generate the chord sequence.
-  ## Get time signature
-  time_sig = [[4,4], [3,4]].choose
-
-  ## Get the chords
-  chord_choice = [:I, :IV, :V, :VI]
-  chords = Array.new(time_sig[0])
-  for i in 0..chords.length - 1
-    chords[i] = fresh
+########### GENERATE CHORD PROGRESSION ############
+# If the chords have NOT already been given, then generate them.
+if chord_progression == nil
+  # If no time signature has been given either then generate one at random
+  if time_sig == nil
+    time_sig == [[3,4],[4,4]].choose
   end
 
-  chord_constraints = []
-  # End on I
-  chord_constraints << eq(chords[chords.length - 1], :I)
-
-  # For the rest, choose a chord at random
-  for i in 0..chords.length - 2
-    chord_constraints << eq(chords[i], chord_choice.choose())
+  # Create a new array with a chord for each beat
+  chord_progression = Array.new(time_sig[0])
+  # Choose each chord at random except the last two which are always IV-I or V-I (plagal or perfect cadence)
+  for i in 0..chord_progression.length - 3
+    chord_progression[i] = chord_choice.choose
   end
-
-  q = fresh
-  run(1, q, eq(q, chords), *chord_constraints)
+  chord_progression[chord_progression.length - 2] = [:IV, :V].choose
+  chord_progression[chord_progression.length - 1] = :I
 end
+###################################################
 
-chords = chords[0]
+############ GET EMPTY CANON STRUCTURE ############
+
+
+
+###################################################
 
 # Get the root notes by choosing ones from the chords
 def names_to_notes(name, scale_ring)
@@ -157,6 +166,8 @@ for i in 0..canon.length - 1
 end
 
 puts canon
+###################################################
+
 
 canon_results = MiniKanren.exec do
 

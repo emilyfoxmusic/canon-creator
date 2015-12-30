@@ -97,3 +97,6 @@ Yesterday I managed to do the exporting to Lilypond. Now I have a lot of tidying
 * Take the notes to proper melodies- 'add spice'. Take into account the user parameters.
 * Complete Sonic Pi player and Lilipond player.
 * Perhaps? Add Midi support. This can be done from Lilypond.
+
+##### Things to tidy up at a later stage:
+* Move the generation of keys/rhythms/time signatures etc. to an earlier point with the user validation.
