@@ -1,16 +1,87 @@
 #$: << '/home/emily/Software/SonicPi/sonic-pi/app/server/vendor/mini_kanren/lib'
 require 'mini_kanren'
 
-###################################################
 ################# USER PARAMETERS #################
-$scale_ring = scale(:c, :major)
+key = nil # [:c, :major]
+scale_range = nil # [:c3, :c6] # inclusive
+num_voices = 4
+time_sig = "4/4"
+probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
+chord_progression = [:I, :IV, :V, :I]
 ###################################################
-################ SYSTEM PARAMETERS ################
-P_SINGLE = 0.25
-P_DOUBLE = 0.25
-P_TRIPLE = 0.25
-P_QUADRUPLE = 0.2
-P_QUINTUPLE = 1
+
+########### SYSTEM GENERATED PARAMETERS ###########
+concrete_scale = nil
+###################################################
+
+########### DO VALIDATION ON PARAMETERS ###########
+# TODO: Check that notes given are valid, and return if they are not
+# TODO: Make whole thing into a procedure so that this is possible
+if (key != nil && key.length != 2) || (key != nil && key[0] == nil)
+  puts "Invalid input: key #{ key }"
+end
+if scale_range != nil && scale_range.length != 2
+  puts "Invalid input: range #{ scale_range }"
+end
+###################################################
+
+########## CONVERT SCALE RANGE TO NUMBERS #########
+if scale_range!= nil
+  scale_range = [note(scale_range[0]), note(scale_range[1])]
+end
+###################################################
+
+############## SET THE CONCRETE SCALE #############
+def get_concrete_scale(key, scale_range)
+  # If key is not given, choose one at random
+  if key == nil
+    tonic = [:c, :cs, :d, :ds, :e, :f, :fs, :g, :gs, :a, :bs, :b].choose
+    type = [:major, :minor].choose
+    key = [tonic, type]
+  end
+
+  # If range is not given, default to entire scale from :c3 to :c6
+  # If part of range is given, set the other to :c3/:c6 as appropriate
+  if scale_range == nil
+    scale_range = [note(:c3), note(:c6)]
+  else
+    if scale_range[0] == nil
+      scale_range[0] = note(:c3)
+    end
+    if scale_range[1] == nil
+      scale_range[1] = note(:c6)
+    end
+  end
+
+  # Find the highest tonic lower than the lower limit
+  min_tonic = note(key[0])
+  while scale_range[0] < min_tonic
+    min_tonic -= 12
+  end
+
+  # Find the lowest tonic higher than the upper limit
+  max_tonic = note(key[0])
+  while scale_range[1] > max_tonic
+    max_tonic += 12
+  end
+
+  # Get the scale between those tonics
+  num_octaves = (max_tonic - min_tonic) / 12
+  concrete_scale = scale(min_tonic, key[1], num_octaves: num_octaves)
+
+  # Convert to an array and trim to range
+  concrete_scale = concrete_scale.to_a
+  concrete_scale.delete_if { |note| (scale_range[0] != nil && note < scale_range[0]) || (scale_range[1] != nil && note > scale_range[1]) }
+
+  # return a hash map containing the scale and other information in case it's been newly generated
+  return {concrete_scale: concrete_scale, key: key, scale_range: scale_range}
+end
+
+# Call the function, and set the properties returned
+concrete_scale_data = get_concrete_scale(key, scale_range)
+concrete_scale = concrete_scale_data[:concrete_scale]
+key = concrete_scale_data[:key]
+scale_range = concrete_scale_data[:scale_range]
 ###################################################
 
 chords = MiniKanren.exec do
