@@ -59,6 +59,7 @@ The new method of using music theory is working nicely. I've just finished a ver
 * Allow user inputs and transform so that it can work in the chained way (ask Sam)
 * Extend to compound time
 * Get different octaves to work
+* Get Sonic Pi to make the notes the right length
 
 ##### Tasks that would be good to start soon:
 
