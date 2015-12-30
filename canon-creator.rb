@@ -1,5 +1,4 @@
-$: << '/home/emily/Software/SonicPi/sonic-pi/app/server/vendor/mini_kanren/lib'
-
+#$: << '/home/emily/Software/SonicPi/sonic-pi/app/server/vendor/mini_kanren/lib'
 require 'mini_kanren'
 
 ###################################################
@@ -45,7 +44,7 @@ chords = chords[0]
 
 # Get the root notes by choosing ones from the chords
 def names_to_notes(name, scale_ring)
-  case :I
+  case name
   when :I
     [scale_ring[1], scale_ring[3], scale_ring[5]].choose
   when :IV
@@ -221,8 +220,8 @@ canon_results = MiniKanren.exec do
     ## Third. Second must be adjacent and fourth is leading to the next. Only valid if not the final note of the melody.
     if next_beat != nil
       options << conde(
-      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note])]),
-      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note])]))
+      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note]).choose]),
+      eq(beat[:notes], [beat[:root_note], get_note_at_offset(beat[:root_note], - 1), beat[:root_note], get_passing_note(beat[:root_note], next_beat[:root_note]).choose]))
     end
 
     ## Fourth. Second and third are each side, or on the same side (either one)
