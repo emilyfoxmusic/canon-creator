@@ -7,6 +7,7 @@ scale_range = nil # [:c3, :c6] # inclusive
 time_sig = "4/4"
 num_voices = 4
 chord_progression = [:I, :IV, :V, :I]
+max_jump = 6
 probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
 ###################################################
 
@@ -42,6 +43,9 @@ if time_sig == "3/4"
 elsif time_sig == "4/4"
   time_sig = [4,4]
 end
+if key != nil
+  key[0] = note(key[0])
+end
 ###################################################
 
 ############## SET THE CONCRETE SCALE #############
@@ -50,7 +54,7 @@ def get_concrete_scale(key, scale_range)
   if key == nil
     tonic = [:c, :cs, :d, :ds, :e, :f, :fs, :g, :gs, :a, :bs, :b].choose
     type = [:major, :minor].choose
-    key = [tonic, type]
+    key = [note(tonic), type]
   end
 
   # If range is not given, default to entire scale from :c3 to :c6
@@ -117,55 +121,194 @@ end
 ###################################################
 
 ############ GET EMPTY CANON STRUCTURE ############
-
-
-
-###################################################
-
-# Get the root notes by choosing ones from the chords
-def names_to_notes(name, scale_ring)
-  case name
-  when :I
-    [scale_ring[1], scale_ring[3], scale_ring[5]].choose
-  when :IV
-    [scale_ring[4], scale_ring[6], scale_ring[8]].choose
-  when :V
-    [scale_ring[5], scale_ring[7], scale_ring[9]].choose
-  when :VI
-    [scale_ring[6], scale_ring[8], scale_ring[10]].choose
-  else
-    puts "Error: no name matches!"
-  end
+# If number of voices is nil then choose one
+if num_voices != nil
+  num_voices = rrand_i(2, time_sig[0])
 end
 
-# Get number of voices
-num_voices = rrand_i(2,4)
-
-root_notes = Array.new(num_voices)
-
-for i in 0..root_notes.length - 1
-  root_notes[i] = Array.new(chords.length)
-  for j in 0..chords.length - 1
-    if (i == root_notes.length && j == root_notes[i].length)
-      root_notes[i][j] = $scale_ring[0]
-    else
-      root_notes[i][j] = names_to_notes(chords[j], $scale_ring)
+# Use MiniKanren to get compatible notes
+canon_structure_options = MiniKanren.exec do
+  extend SonicPi::Lang::Core
+  extend SonicPi::RuntimeMethods
+  # Generate the structure with the root notes as fresh variables
+  canon = Array.new(time_sig[0])
+  for i in 0..canon.length - 1
+    canon[i] = Array.new(time_sig[0])
+    for j in 0..canon[i].length - 1
+      canon[i][j] = {root_note: fresh, rhythm: nil, notes: nil}
     end
   end
-end
 
-puts root_notes
+  # Add constraints
+  constraints = []
 
-# Generate the canon structure
-canon = Array.new(root_notes.length)
-for i in 0..canon.length - 1
-  canon[i] = Array.new(root_notes[i].length)
-  for j in 0..root_notes[i].length - 1
-    canon[i][j] = {root_note: root_notes[i][j], rhythm: nil, notes: nil}
+  ## Add constraint: final root note is the tonic
+  ### Find all the tonics in the given range and add their disjunction as a constraint
+  mod_tonic = key[0] % 12
+  tonics_in_scale = concrete_scale.select { |note| note % 12 == mod_tonic }
+
+  conde_options = []
+  tonics_in_scale.map { |tonic| conde_options << eq(canon[time_sig[0] - 1][time_sig[0] - 1][:root_note], tonic) }
+
+  constraints << conde(*conde_options)
+
+  ## Add constraint: All notes are in the relevant chord
+  def is_in_chord(var, name, concrete_scale, key)
+    case name
+    when :I
+      ### Find mods of notes needed
+      ### I is tonics, thirds and fifths
+      mod_tonic = key[0] % 12
+      if key[1] == :major
+        mod_third = mod_tonic + 4 % 12
+      else
+        mod_third = mod_tonic + 3 % 12
+      end
+      mod_fifth = mod_tonic + 7 % 12
+      ### Find notes from scale
+      notes_in_I = concrete_scale.select do |note|
+        mod_note = note % 12
+        mod_note == mod_tonic || mod_note == mod_third || mod_note == mod_fifth
+      end
+      ### Return a conde clause of the variable equalling each of these
+      conde_options = []
+      notes_in_I.map { |note| conde_options << eq(var, note) }
+      return conde(*conde_options)
+    when :IV
+      ### Find mods of notes needed
+      ### IV is fourths, sixths and tonics
+      mod_tonic = key[0] % 12
+      if key[1] == :major
+        mod_sixth = mod_tonic + 9 % 12
+      else
+        mod_sixth = mod_tonic + 8 % 12
+      end
+      mod_fourth = mod_tonic + 5 % 12
+      ### Find notes from scale
+      notes_in_IV = concrete_scale.select do |note|
+        mod_note = note % 12
+        mod_note == mod_fourth || mod_note == mod_sixth || mod_note == mod_tonic
+      end
+      ### Return a conde clause of the variable equalling each of these
+      conde_options = []
+      notes_in_IV.map { |note| conde_options << eq(var, note) }
+      return conde(*conde_options)
+    when :V
+      ### Find mods of notes needed
+      ### V is fifths, sevenths and seconds
+      mod_tonic = key[0] % 12
+      if key[1] == :major
+        mod_second = mod_tonic + 2 % 12
+        mod_seventh = mod_tonic + 11 % 12
+      else
+        mod_second = mod_tonic + 1 % 12
+        mod_seventh = mod_tonic + 10 % 12
+      end
+      mod_fifth = mod_tonic + 7 % 12
+      ### Find notes from scale
+      notes_in_V = concrete_scale.select do |note|
+        mod_note = note % 12
+        mod_note == mod_fifth || mod_note == mod_seventh || mod_note == mod_second
+      end
+      ### Return a conde clause of the variable equalling each of these
+      conde_options = []
+      notes_in_V.map { |note| conde_options << eq(var, note) }
+      return conde(*conde_options)
+    when :VI
+      ### Find mods of notes needed
+      ### VI is sixths, tonics and thirds
+      mod_tonic = key[0] % 12
+      if key[1] == :major
+        mod_third = mod_tonic + 4 % 12
+        mod_sixth = mod_tonic + 9 % 12
+      else
+        mod_third = mod_tonic + 3 % 12
+        mod_sixth = mod_tonic + 8 % 12
+      end
+      ### Find notes from scale
+      notes_in_VI = concrete_scale.select do |note|
+        mod_note = note % 12
+        mod_note == mod_sixth || mod_note == mod_tonic || mod_note == mod_third
+      end
+      ### Return a conde clause of the variable equalling each of these
+      conde_options = []
+      notes_in_VI.map { |note| conde_options << eq(var, note) }
+      return conde(*conde_options)
+    else
+      puts "Error: unrecognised chord #{ name }"
+    end
   end
+
+  ### Set the constraint for each note
+  for i in 0..canon.length - 1
+    for j in 0..canon[i].length - 1
+      constraints << is_in_chord(canon[i][j][:root_note], chord_progression[j], concrete_scale, key)
+    end
+  end
+
+  ## Successive root notes are within max_jump semitones from each other
+  def have_max_distance(var1, var2, max_distance)
+    project(var1, lambda { |var1| project(var2, lambda { |var2| (var1 - var2).abs <= max_distance ? lambda { |x| x } : lambda { |x| nil } }) })
+  end
+
+  for i in 0..canon.length - 1
+    for j in 0..canon[i].length - 1
+      if j < canon[i].length - 1
+        ### Not last in a bar
+        constraints << have_max_distance(canon[i][j][:root_note], canon[i][j + 1][:root_note], max_jump)
+      elsif i < canon.length - 1
+        ### Last note in a bar, but not of the entire piece
+        constraints << have_max_distance(canon[i][j][:root_note], canon[i + 1][0][:root_note], max_jump)
+      end
+    end
+  end
+
+  ## Successive bars do not have the same note for the same position in the chord
+  def is_different(*vars)
+    var1, var2, var3, var4 = *vars
+    if (var4 == nil)
+      ### Three args
+      project(var1,
+      lambda do |var1| project(var2,
+        lambda do |var2| project(var3,
+          lambda do |var3|
+            (var1 != var2 && var1 != var3 && var2 != var3) ? lambda { |x| x } : lambda { |x| nil }
+          end)
+        end)
+      end)
+    else
+      ### Four args
+      project(var1,
+      lambda do |var1| project(var2,
+        lambda do |var2| project(var3,
+          lambda do |var3| project(var4,
+            lambda do |var4|
+              (var1 != var2 && var1 != var3 && var1 != var4 && var2 != var3 && var2 != var4 && var3 != var4) ? lambda { |x| x } : lambda { |x| nil }
+            end)
+          end)
+        end)
+      end)
+    end
+  end
+
+  ### Set the notes to be different in every bar for each beat
+  if time_sig[0] == 3
+    for j in 0..time_sig[0] - 1
+      constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note])
+    end
+  else
+    for j in 0..time_sig[0] - 1
+      constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note], canon[3][j][:root_note])
+    end
+  end
+
+  # Run the query
+  q = fresh
+  run(1, q, eq(q, canon), *constraints)
 end
 
-puts canon
+# Choose one to be this structure
+canon = canon_structure_options.choose
 ###################################################
 
 
