@@ -305,7 +305,35 @@ canon_structure_options = MiniKanren.exec do
 end
 
 # Choose one to be this structure
-canon = canon_structure_options.choose
+canon_skeleton = canon_structure_options.choose
 ###################################################
 
-puts canon
+puts canon_skeleton
+
+########### GENERATE THE CANONIC MELODY ###########
+canon_completed_options = MiniKanren.exec do
+  extend SonicPi::Lang::Core
+  extend SonicPi::RuntimeMethods
+
+  ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
+  # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
+  def find_walking_notes(note1, note2, number_of_steps)
+
+  end
+
+  # Given a note, return the note at that offset in the scale
+  def get_note_at_offset(note, offset)
+
+  end
+  ################################################
+
+  ########### TRANSFORMATION FUNCTIONS ###########
+
+  ################################################
+
+  ############ TRANSFORM THE SKELETON ############
+
+  ################################################
+end
+
+###################################################
