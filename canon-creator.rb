@@ -7,7 +7,7 @@ scale_range = nil # [:c3, :c6] # inclusive
 time_sig = "4/4"
 num_voices = 4
 chord_progression = [:I, :IV, :V, :I]
-max_jump = 6
+max_jump = 5
 probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
 ###################################################
 
@@ -233,7 +233,7 @@ canon_structure_options = MiniKanren.exec do
     possible_notes = notes_in_chord(chord_name, concrete_scale, key)
     project(next_beat_var, lambda do |next_beat|
       refined_possibilities = possible_notes.select do |note|
-        (note - next_beat).abs <= max_jump
+        (note - next_beat).abs <= max_jump && (note - next_beat).abs != 0
       end
       ### Return a conde clause of all these options
       conde_options = []
@@ -260,9 +260,48 @@ canon_structure_options = MiniKanren.exec do
     end
   end
 
+  ## Successive bars do not have the same note for the same position in the chord
+  def is_different(*vars)
+    var1, var2, var3, var4 = *vars
+    if (var4 == nil)
+      ### Three args
+      project(var1,
+      lambda do |var1| project(var2,
+        lambda do |var2| project(var3,
+          lambda do |var3|
+            (var1 != var2 && var1 != var3 && var2 != var3) ? lambda { |x| x } : lambda { |x| nil }
+          end)
+        end)
+      end)
+    else
+      ### Four args
+      project(var1,
+      lambda do |var1| project(var2,
+        lambda do |var2| project(var3,
+          lambda do |var3| project(var4,
+            lambda do |var4|
+              (var1 != var2 && var1 != var3 && var1 != var4 && var2 != var3 && var2 != var4 && var3 != var4) ? lambda { |x| x } : lambda { |x| nil }
+            end)
+          end)
+        end)
+      end)
+    end
+  end
+
+  ### Set the notes to be different in every bar for each beat
+  if time_sig[0] == 3
+    for j in 0..time_sig[0] - 1
+      constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note])
+    end
+  else
+    for j in 0..time_sig[0] - 1
+      constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note], canon[3][j][:root_note])
+    end
+  end
+
   # Run the query
   q = fresh
-  run(1, q, eq(q, canon), *constraints)
+  run(50, q, eq(q, canon), *constraints)
 end
 
 # Choose one to be this structure
