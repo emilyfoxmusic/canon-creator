@@ -8,7 +8,7 @@ time_sig = "4/4"
 num_voices = 4
 chord_progression = [:I, :IV, :V, :I]
 max_jump = 5
-probabilities = [0.25, 0.25, 0.25, 0.2, 0.05]
+probabilities = [0.5, 0.5, 0.0, 0.0]
 ###################################################
 
 ########### SYSTEM GENERATED PARAMETERS ###########
@@ -315,6 +315,8 @@ canon_completed_options = MiniKanren.exec do
   extend SonicPi::Lang::Core
   extend SonicPi::RuntimeMethods
 
+  constraints = []
+
   ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
   # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
   def find_walking_notes(note1, note2, number_of_steps)
@@ -328,7 +330,64 @@ canon_completed_options = MiniKanren.exec do
   ################################################
 
   ########### TRANSFORMATION FUNCTIONS ###########
+  # Transform this beat into a more interesting melody, taking into account the previous beat if this is the last one in the piece, or the next beat otherwise
+  # v1.0 supports up to a four way split
+  # The logic does not supply every option for every variable else it would be too inefficient. Rhythm is hardcoded in v1.0, based on the random variable
+  def transform_beat(current_beat, other_beat, is_last_note)
+    fate = rand()
+    if fate < probabilities[0]
+      transform_beat_single(current_beat)
+    elsif fate < probabilities[0] + probabilities[1]
+      transform_beat_double(current_beat, other_beat, is_last_note)
+    elsif fate < probabilities[0] + probabilities[1] + probabilities[2]
+      transform_beat_triple(current_beat, other_beat, is_last_note)
+    else
+      transform_beat_quadruple(current_beat, other_beat, is_last_note)
+    end
 
+  end
+
+  # Transform beat into a single note
+  def transform_beat_single(current_beat)
+    # This note should be the root
+    constraints << all(eq(beat[:rhythm], [Rational(1)]), eq(beat[:notes], [beat[:root_note]]))
+  end
+
+  # Transform the beat into a two notes
+  def transform_beat_double(current_beat, other_beat, is_last_note)
+    # Rhythm
+    constraints << eq(current_beat[:rhythm], [Rational(1,2), Rational(1,2)])
+    # Pitch
+    n1, n2 = fresh(2)
+    constraints << eq(current_beat[:notes], [n1, n2])
+    if is_last_note
+      # This is the final note of the piece. The second note should be the root and the first a good step to it
+      constraints << eq(n2, current_beat[:root_note])
+      constraints << project(other_beat, lambda do |prev|
+        conde_options = []
+        find_walking_notes(prev[:notes].last, current_beat[:root_note], 1).map do |possible_note|
+          conde_options << eq(n1, possible_note)
+        end
+        return conde(*conde_options)
+      end)
+    else
+      # The first note should be the root, and the second a good step to the next
+      constraints << eq(n1, current_beat[:root_note])
+      conde_options = []
+      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1).map do |possible_note|
+        conde_options << eq(n2, possible_note)
+      end
+      constraints << conde(*conde_options)
+    end
+  end
+
+  def transform_beat_triple(current_beat, next_beat)
+
+  end
+
+  def transform_beat_quadruple(current_beat, next beat)
+
+  end
   ################################################
 
   ############ TRANSFORM THE SKELETON ############
