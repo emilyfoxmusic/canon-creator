@@ -472,9 +472,10 @@ canon_completed_options = MiniKanren.exec do
         conde_options << eq([n2, n3], possible_notes)
       end
       constraints << conde(*conde_options)
+    end
   end
 
-  def transform_beat_quadruple(current_beat, other_beat, is_last_note)
+  def transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
 
   end
   ################################################
