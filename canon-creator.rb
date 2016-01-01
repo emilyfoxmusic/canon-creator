@@ -8,7 +8,7 @@ time_sig = "4/4"
 num_voices = 4
 chord_progression = [:I, :IV, :V, :I]
 max_jump = 5
-probabilities = [0.5, 0.5, 0.0, 0.0]
+probabilities = [0.3, 0.3, 1, 0.0]
 ###################################################
 
 ########### SYSTEM GENERATED PARAMETERS ###########
@@ -317,13 +317,78 @@ canon_completed_options = MiniKanren.exec do
 
   ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
   # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
-  def find_walking_notes(note1, note2, number_of_steps)
-    return [note1, note2]
+  def find_walking_notes(note1, note2, number_of_steps = 1)
+    difference_in_index = concrete_scale.index(note1) - concrete_scale.index(note2)
+    case number_of_steps
+    when 1
+      # Find the median between the notes (both if there are multiple)
+      walking_notes = find_median_note(note1, note2)
+      # Add relevant adjacent notes if they are adjacent or the same
+      if difference_in_index == 0 || difference_in_index == 1
+        walking_notes << get_note_at_offset(note1, 1)
+      end
+      if difference_in_index == 0 || difference_in_index == -1
+        walking_notes << get_note_at_offset(note1, -1)
+      end
+      return walking_notes
+    when 2
+      walking_notes = []
+      # Choose good notes
+      if difference_in_index == 0
+        return [
+          [get_note_at_offset(note1, 1), get_note_at_offset(note1, -1)],
+          [get_note_at_offset(note1, -1), get_note_at_offset(note1, 1)]
+        ]
+      elsif difference_in_index == 1
+        return [
+          [get_note_at_offset(note1, 1), get_note_at_offset(note1, -2)],
+          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
+          [get_note_at_offset(note1, -2), get_note_at_offset(note1, -3)]
+        ]
+      elsif difference_in_index == -1
+        return [
+          [get_note_at_offset(note1, -1), get_note_at_offset(note1, 2)],
+          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
+          [get_note_at_offset(note1, 2), get_note_at_offset(note1, 3)]
+        ]
+      elsif difference_in_index == 2
+        return [
+          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -3)],
+          [get_note_at_offset(note1, -3), get_note_at_offset(note1, -1)],
+          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
+          [note1, get_note_at_offset(note1, -1)]
+        ]
+      elsif difference_in_index == -2
+        return [
+          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 3)],
+          [get_note_at_offset(note1, 3), get_note_at_offset(note1, 1)],
+          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
+          [note1, get_note_at_offset(note1, 1)]
+        ]
+      end
+    else
+      puts "Error: invalid number of steps. Only 1 or 2 are valid."
+    end
+  end
+
+  def find_median_note(note1, note2)
+    index_1 = concrete_scale.index(note1)
+    index_2 = concrete_scale.index(note2)
+    median_index = (index_1 + index_2) / 2.0
+    lower_median = concrete_scale[median_index.floor]
+    upper_median = concrete_scale[median_index.ceil]
+    if lower_median == upper_median
+      return [lower_median]
+    else
+      return [lower_median, upper_median]
+    end
   end
 
   # Given a note, return the note at that offset in the scale
   def get_note_at_offset(note, offset)
-
+    index = concrete_scale.index(note)
+    index = index + offset
+    return concrete_scale[index]
   end
   ################################################
 
@@ -379,11 +444,37 @@ canon_completed_options = MiniKanren.exec do
     end
   end
 
-  def transform_beat_triple(current_beat, next_beat, is_last_note)
-
+  def transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
+    # Rhythm
+    constraints << conde(
+    eq(beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
+    eq(beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
+    eq(beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+    )
+    # Pitch
+    n1, n2, n3 = fresh(3)
+    constraints << eq(current_beat[:notes], [n1, n2, n3])
+    if is_last_note
+      # The last should be the root
+      constraints << eq(n3, current_beat[:root_note])
+      constraints << project(other_beat, lambda do |prev|
+        conde_options = []
+        find_walking_notes(prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
+          conde_options << eq([n1, n2], possible_notes)
+        end
+        return conde(*conde_options)
+      end)
+    else
+      # The first should be the root, and find other good ones.
+      constraints << eq(n1, current_beat[:root_note])
+      conde_options = []
+      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2).map do |possible_notes|
+        conde_options << eq([n2, n3], possible_notes)
+      end
+      constraints << conde(*conde_options)
   end
 
-  def transform_beat_quadruple(current_beat, next_beat, is_last_note)
+  def transform_beat_quadruple(current_beat, other_beat, is_last_note)
 
   end
   ################################################

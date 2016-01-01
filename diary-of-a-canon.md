@@ -100,3 +100,14 @@ Yesterday I managed to do the exporting to Lilypond. Now I have a lot of tidying
 
 ##### Things to tidy up at a later stage:
 * Move the generation of keys/rhythms/time signatures etc. to an earlier point with the user validation.
+
+#### Date: January 1st 2016
+Error handing:
+* No options for project- if statement to return fail if so. Also check whether my theory is correct about handling of this.
+* If notes are not in scale for median etc. methods
+* For notes out of scale!!
+Other: Change success and fail to actual methods rather than hard coded lambdas
+
+Ideas for future versions:
+* Add rests
+* Add same note being allowed?
