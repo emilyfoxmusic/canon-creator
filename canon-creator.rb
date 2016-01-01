@@ -315,12 +315,10 @@ canon_completed_options = MiniKanren.exec do
   extend SonicPi::Lang::Core
   extend SonicPi::RuntimeMethods
 
-  constraints = []
-
   ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
   # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
   def find_walking_notes(note1, note2, number_of_steps)
-
+    return [note1, note2]
   end
 
   # Given a note, return the note at that offset in the scale
@@ -333,28 +331,28 @@ canon_completed_options = MiniKanren.exec do
   # Transform this beat into a more interesting melody, taking into account the previous beat if this is the last one in the piece, or the next beat otherwise
   # v1.0 supports up to a four way split
   # The logic does not supply every option for every variable else it would be too inefficient. Rhythm is hardcoded in v1.0, based on the random variable
-  def transform_beat(current_beat, other_beat, is_last_note)
+  def transform_beat(probabilities, constraints, current_beat, other_beat, is_last_note)
     fate = rand()
     if fate < probabilities[0]
-      transform_beat_single(current_beat)
+      transform_beat_single(constraints, current_beat)
     elsif fate < probabilities[0] + probabilities[1]
-      transform_beat_double(current_beat, other_beat, is_last_note)
+      transform_beat_double(constraints, current_beat, other_beat, is_last_note)
     elsif fate < probabilities[0] + probabilities[1] + probabilities[2]
-      transform_beat_triple(current_beat, other_beat, is_last_note)
+      transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
     else
-      transform_beat_quadruple(current_beat, other_beat, is_last_note)
+      transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
     end
 
   end
 
   # Transform beat into a single note
-  def transform_beat_single(current_beat)
+  def transform_beat_single(constraints, current_beat)
     # This note should be the root
-    constraints << all(eq(beat[:rhythm], [Rational(1)]), eq(beat[:notes], [beat[:root_note]]))
+    constraints << all(eq(current_beat[:rhythm], [Rational(1)]), eq(current_beat[:notes], [current_beat[:root_note]]))
   end
 
   # Transform the beat into a two notes
-  def transform_beat_double(current_beat, other_beat, is_last_note)
+  def transform_beat_double(constraints, current_beat, other_beat, is_last_note)
     # Rhythm
     constraints << eq(current_beat[:rhythm], [Rational(1,2), Rational(1,2)])
     # Pitch
@@ -381,18 +379,58 @@ canon_completed_options = MiniKanren.exec do
     end
   end
 
-  def transform_beat_triple(current_beat, next_beat)
+  def transform_beat_triple(current_beat, next_beat, is_last_note)
 
   end
 
-  def transform_beat_quadruple(current_beat, next beat)
+  def transform_beat_quadruple(current_beat, next_beat, is_last_note)
 
   end
   ################################################
 
   ############ TRANSFORM THE SKELETON ############
+  # Initialise canon and constraints
+  constraints = []
+  canon = canon_skeleton
 
+  # Make the notes into fresh variables
+  for i in 0..canon.length - 1
+    for j in 0..canon[i].length - 1
+      canon[i][j][:rhythm] = fresh
+      canon[i][j][:notes] = fresh
+    end
+  end
+
+  # Transform all the beats
+  for i in 0..canon.length - 1
+    for j in 0..canon[i].length - 1
+      other_beat = nil
+      is_last_note = false
+      # is the next beat in this bar?
+      if j == canon[i].length - 1
+        # NO, is it in the next?
+        if i == canon.length - 1
+          # NO (there is no next beat- this is the final beat)
+          other_beat = canon[i][j - 1]
+          is_last_note = true
+        else
+          # YES (the next beat is the first beat of the next bar)
+          other_beat = canon[i + 1][0]
+        end
+      else
+        # YES (the next beat is in this bar)
+        other_beat = canon[i][j + 1]
+      end
+      transform_beat(probabilities, constraints, canon[i][j], other_beat, is_last_note)
+    end
+  end
+
+  # run the query using q, a fresh query variable
+  q = fresh
+  run(1, q, eq(q, canon), *constraints)
   ################################################
 end
+
+puts canon_completed_options
 
 ###################################################
