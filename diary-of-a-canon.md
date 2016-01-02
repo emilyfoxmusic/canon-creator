@@ -111,3 +111,6 @@ Other: Change success and fail to actual methods rather than hard coded lambdas
 Ideas for future versions:
 * Add rests
 * Add same note being allowed?
+
+#### Date: January 2nd 2016
+TO DO BEFORE RELEASE: Change transforms into one method since they effectively do the same thing, just with different numbers of notes.

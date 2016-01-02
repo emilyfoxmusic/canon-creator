@@ -476,7 +476,30 @@ canon_completed_options = MiniKanren.exec do
   end
 
   def transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
-
+    # Rhythm
+    constraints << eq(beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)])
+    # Pitch
+    n1, n2, n3, n4 = fresh(4)
+    constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
+    if is_last_note
+      # The final one should be the root
+      constraints << eq(n4, current_beat[:root_note])
+      constraints << project(other_beat, lambda do |prev|
+        conde_options = []
+        find_walking_notes(prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
+          conde_options << eq([n1, n2, n3], possible_notes)
+        end
+        return conde(*conde_options)
+      end)
+    else
+      # The first should be the root, and find other good ones.
+      constraints << eq(n1, current_beat[:root_note])
+      conde_options = []
+      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 3).map do |possible_notes|
+        conde_options << eq([n2, n3, n4], possible_notes)
+      end
+      constraints << conde(*conde_options)
+    end
   end
   ################################################
 
