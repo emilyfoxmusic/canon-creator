@@ -1,3 +1,5 @@
+
+
 def play_melody(mel)
   num_bars = mel.length
   for i in 0..num_bars - 1
@@ -13,10 +15,13 @@ def play_bar(bar)
 end
 
 def play_beat(beat)
+  proportion_sustain = 0.7
+  proportion_release = 0.3
   pairs = beat[:rhythm].zip(beat[:notes])
   pairs.map do |pair|
-    play pair[1]
-    sleep pair[0]
+    # pair[0] = pair[0] == (1/2) ? 0.5 : 1 # TODO: TEMP: uncomment if using copied and pasted canons
+    play pair[1], attack: 0, sustain: pair[0] * proportion_sustain, release: pair[0] * proportion_release
+    sleep pair[0].to_f
   end
 end
 
