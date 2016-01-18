@@ -19,7 +19,7 @@ def play_beat(beat)
   proportion_release = 0.3
   pairs = beat[:rhythm].zip(beat[:notes])
   pairs.map do |pair|
-    # pair[0] = pair[0] == (1/2) ? 0.5 : 1 # TODO: TEMP: uncomment if using copied and pasted canons
+    # pair[0] = pair[0] == Rational(1,2) ? 0.5 : 1 # TODO: TEMP: uncomment if using copied and pasted canons
     play pair[1], attack: 0, sustain: pair[0] * proportion_sustain, release: pair[0] * proportion_release
     sleep pair[0].to_f
   end

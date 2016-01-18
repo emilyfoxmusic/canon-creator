@@ -114,3 +114,6 @@ Ideas for future versions:
 
 #### Date: January 2nd 2016
 TO DO BEFORE RELEASE: Change transforms into one method since they effectively do the same thing, just with different numbers of notes.
+
+#### Date: January 18th 2016
+TO DO: Tidy up the exporter by taking the keys off into separate arrays at the top of the method.
