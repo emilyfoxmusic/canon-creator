@@ -7,6 +7,17 @@ def get_lilypond_note(key, note_number)
   # Only MAJOR KEYS TODO: Implement minors
 
   def get_note_name(key, note_number)
+    # Arrays with the keys that contain that note.
+    c_sharp_keys = [[:fs, :major], [:b, :major], [:e, :major], [:a, :major], [:d, :major], [:b, :minor], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
+    d_flat_keys = [[:ab, :major], [:db, :major], [:gb, :major], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
+    d_sharp_keys = [[:fs, :major],[:b, :major],[:e, :major], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
+    e_flat_keys = [[:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:g, :minor], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
+    f_sharp_keys = [[:fs, :major],[:b, :major],[:e, :major],[:a, :major],[:d, :major], [:g, :major], [:e, :minor], [:b, :minor], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
+    g_flat_keys = [[:db, :major], [:gb, :major], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
+    g_sharp_keys = [[:fs, :major], [:b, :major], [:e, :major], [:a, :major], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
+    a_flat_keys = [[:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
+    a_sharp_keys = [[:fs, :major],[:b, :major], [:gs, :minor], [:ds, :minor], [:as, :minor]]
+    b_flat_keys = [[:f, :major], [:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:d, :minor], [:g, :minor], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
     # Ones without sharps/flats are all the same
     # Special cases depend on the key
     case note_number % 12
@@ -27,50 +38,50 @@ def get_lilypond_note(key, note_number)
       return "b"
       # ~~~~ strange ones ~~~~ #
     when 1 # C# / Db
-      if [[:fs, :major],[:b, :major],[:e, :major],[:a, :major],[:d, :major]].include?(key)
+      if c_sharp_keys.include?(key)
         # This is C#
         return "cis"
-      elsif [[:ab, :major], [:db, :major], [:gb, :major]].include?(key)
+      elsif d_flat_keys.include?(key)
         # This is Db
         return "des"
       else
         puts "Error: note #{ note_number } not in the key #{ key[0] } #{ key[1] }!"
       end
     when 3 # D# / Eb
-      if [[:fs, :major],[:b, :major],[:e, :major]].include?(key)
+      if d_sharp_keys.include?(key)
         # This is D#
         return "dis"
-      elsif [[:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major]].include?(key)
+      elsif e_flat_keys.include?(key)
         # This is Eb
         return "ees"
       else
         puts "Error: note #{ note_number } not in the key #{ key[0] } #{ key[1] }!"
       end
     when 6 # F# / Gb
-      if [[:fs, :major],[:b, :major],[:e, :major],[:a, :major],[:d, :major], [:g, :major]].include?(key)
+      if f_sharp_keys.include?(key)
         # This is F#
         return "fis"
-      elsif [[:db, :major], [:gb, :major]].include?(key)
+      elsif g_flat_keys.include?(key)
         # This is Gb
         return "ges"
       else
         puts "Error: note #{ note_number } not in the key #{ key[0] } #{ key[1] }!"
       end
     when 8 # G# / Ab
-      if [[:fs, :major],[:b, :major],[:e, :major],[:a, :major]].include?(key)
+      if g_sharp_keys.include?(key)
         # This is G#
         return "gis"
-      elsif [[:eb, :major], [:ab, :major], [:db, :major], [:gb, :major]].include?(key)
+      elsif a_flat_keys.include?(key)
         # This is Ab
         return "aes"
       else
         puts "Error: note #{ note_number } not in the key #{ key[0] } #{ key[1] }!"
       end
     when 10 # A# / Bb
-      if [[:fs, :major],[:b, :major]].include?(key)
+      if a_sharp_keys.include?(key)
         # This is A#
         return "ais"
-      elsif [[:f, :major], [:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major]].include?(key)
+      elsif b_flat_keys.include?(key)
         # This is Bb
         return "bes"
       else

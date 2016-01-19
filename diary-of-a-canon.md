@@ -117,3 +117,6 @@ TO DO BEFORE RELEASE: Change transforms into one method since they effectively d
 
 #### Date: January 18th 2016
 TO DO: Tidy up the exporter by taking the keys off into separate arrays at the top of the method.
+
+#### Date: January 19th 2016
+TO DO: Sort out which keys are supported and make sure the exporter supports them all properly. Make it so that the user note is not deleted by replacing with a number.
