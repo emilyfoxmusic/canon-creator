@@ -317,18 +317,18 @@ canon_completed_options = MiniKanren.exec do
 
   ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
   # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
-  def find_walking_notes(note1, note2, number_of_steps = 1)
+  def find_walking_notes(concrete_scale, note1, note2, number_of_steps = 1)
     difference_in_index = concrete_scale.index(note1) - concrete_scale.index(note2)
     case number_of_steps
     when 1
       # Find the median between the notes (both if there are multiple)
-      walking_notes = find_median_note(note1, note2)
+      walking_notes = find_median_note(concrete_scale, note1, note2)
       # Add relevant adjacent notes if they are adjacent or the same
       if difference_in_index == 0 || difference_in_index == 1
-        walking_notes << get_note_at_offset(note1, 1)
+        walking_notes << get_note_at_offset(concrete_scale, note1, 1)
       end
       if difference_in_index == 0 || difference_in_index == -1
-        walking_notes << get_note_at_offset(note1, -1)
+        walking_notes << get_note_at_offset(concrete_scale, note1, -1)
       end
       return walking_notes
     when 2
@@ -336,34 +336,34 @@ canon_completed_options = MiniKanren.exec do
       # Choose good notes
       if difference_in_index == 0
         return [
-          [get_note_at_offset(note1, 1), get_note_at_offset(note1, -1)],
-          [get_note_at_offset(note1, -1), get_note_at_offset(note1, 1)]
+          [get_note_at_offset(concrete_scale, note1, 1), get_note_at_offset(concrete_scale, note1, -1)],
+          [get_note_at_offset(concrete_scale, note1, -1), get_note_at_offset(concrete_scale, note1, 1)]
         ]
       elsif difference_in_index == 1
         return [
-          [get_note_at_offset(note1, 1), get_note_at_offset(note1, -2)],
-          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
-          [get_note_at_offset(note1, -2), get_note_at_offset(note1, -3)]
+          [get_note_at_offset(concrete_scale, note1, 1), get_note_at_offset(concrete_scale, note1, -2)],
+          [get_note_at_offset(concrete_scale, note1, 1), get_note_at_offset(concrete_scale, note1, 2)],
+          [get_note_at_offset(concrete_scale, note1, -2), get_note_at_offset(concrete_scale, note1, -3)]
         ]
       elsif difference_in_index == -1
         return [
-          [get_note_at_offset(note1, -1), get_note_at_offset(note1, 2)],
-          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
-          [get_note_at_offset(note1, 2), get_note_at_offset(note1, 3)]
+          [get_note_at_offset(concrete_scale, note1, -1), get_note_at_offset(concrete_scale, note1, 2)],
+          [get_note_at_offset(concrete_scale, note1, -1), get_note_at_offset(concrete_scale, note1, -2)],
+          [get_note_at_offset(concrete_scale, note1, 2), get_note_at_offset(concrete_scale, note1, 3)]
         ]
       elsif difference_in_index == 2
         return [
-          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -3)],
-          [get_note_at_offset(note1, -3), get_note_at_offset(note1, -1)],
-          [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
-          [note1, get_note_at_offset(note1, -1)]
+          [get_note_at_offset(concrete_scale, note1, -1), get_note_at_offset(concrete_scale, note1, -3)],
+          [get_note_at_offset(concrete_scale, note1, -3), get_note_at_offset(concrete_scale, note1, -1)],
+          [get_note_at_offset(concrete_scale, note1, -1), get_note_at_offset(concrete_scale, note1, -2)],
+          [note1, get_note_at_offset(concrete_scale, note1, -1)]
         ]
       elsif difference_in_index == -2
         return [
-          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 3)],
-          [get_note_at_offset(note1, 3), get_note_at_offset(note1, 1)],
-          [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
-          [note1, get_note_at_offset(note1, 1)]
+          [get_note_at_offset(concrete_scale, note1, 1), get_note_at_offset(concrete_scale, note1, 3)],
+          [get_note_at_offset(concrete_scale, note1, 3), get_note_at_offset(concrete_scale, note1, 1)],
+          [get_note_at_offset(concrete_scale, note1, 1), get_note_at_offset(concrete_scale, note1, 2)],
+          [note1, get_note_at_offset(concrete_scale, note1, 1)]
         ]
       end
     else
@@ -371,7 +371,7 @@ canon_completed_options = MiniKanren.exec do
     end
   end
 
-  def find_median_note(note1, note2)
+  def find_median_note(concrete_scale, note1, note2)
     index_1 = concrete_scale.index(note1)
     index_2 = concrete_scale.index(note2)
     median_index = (index_1 + index_2) / 2.0
@@ -385,7 +385,7 @@ canon_completed_options = MiniKanren.exec do
   end
 
   # Given a note, return the note at that offset in the scale
-  def get_note_at_offset(note, offset)
+  def get_note_at_offset(concrete_scale, note, offset)
     index = concrete_scale.index(note)
     index = index + offset
     return concrete_scale[index]
@@ -396,14 +396,14 @@ canon_completed_options = MiniKanren.exec do
   # Transform this beat into a more interesting melody, taking into account the previous beat if this is the last one in the piece, or the next beat otherwise
   # v1.0 supports up to a four way split
   # The logic does not supply every option for every variable else it would be too inefficient. Rhythm is hardcoded in v1.0, based on the random variable
-  def transform_beat(probabilities, constraints, current_beat, other_beat, is_last_note)
+  def transform_beat(concrete_scale, probabilities, constraints, current_beat, other_beat, is_last_note)
     fate = rand()
     if fate < probabilities[0]
       transform_beat_single(constraints, current_beat)
     elsif fate < probabilities[0] + probabilities[1]
-      transform_beat_double(constraints, current_beat, other_beat, is_last_note)
+      transform_beat_double(concrete_scale, constraints, current_beat, other_beat, is_last_note)
     elsif fate < probabilities[0] + probabilities[1] + probabilities[2]
-      transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
+      transform_beat_triple(concrete_scale, constraints, current_beat, other_beat, is_last_note)
     else
       transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
     end
@@ -417,7 +417,7 @@ canon_completed_options = MiniKanren.exec do
   end
 
   # Transform the beat into a two notes
-  def transform_beat_double(constraints, current_beat, other_beat, is_last_note)
+  def transform_beat_double(concrete_scale, constraints, current_beat, other_beat, is_last_note)
     # Rhythm
     constraints << eq(current_beat[:rhythm], [Rational(1,2), Rational(1,2)])
     # Pitch
@@ -428,7 +428,7 @@ canon_completed_options = MiniKanren.exec do
       constraints << eq(n2, current_beat[:root_note])
       constraints << project(other_beat, lambda do |prev|
         conde_options = []
-        find_walking_notes(prev[:notes].last, current_beat[:root_note], 1).map do |possible_note|
+        find_walking_notes(concrete_scale, prev[:notes].last, current_beat[:root_note], 1).map do |possible_note|
           conde_options << eq(n1, possible_note)
         end
         return conde(*conde_options)
@@ -437,19 +437,19 @@ canon_completed_options = MiniKanren.exec do
       # The first note should be the root, and the second a good step to the next
       constraints << eq(n1, current_beat[:root_note])
       conde_options = []
-      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1).map do |possible_note|
+      find_walking_notes(concrete_scale, current_beat[:root_note], other_beat[:root_note], 1).map do |possible_note|
         conde_options << eq(n2, possible_note)
       end
       constraints << conde(*conde_options)
     end
   end
 
-  def transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
+  def transform_beat_triple(concrete_scale, constraints, current_beat, other_beat, is_last_note)
     # Rhythm
     constraints << conde(
-    eq(beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
-    eq(beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
-    eq(beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+    eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
+    eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
+    eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
     )
     # Pitch
     n1, n2, n3 = fresh(3)
@@ -459,7 +459,7 @@ canon_completed_options = MiniKanren.exec do
       constraints << eq(n3, current_beat[:root_note])
       constraints << project(other_beat, lambda do |prev|
         conde_options = []
-        find_walking_notes(prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
+        find_walking_notes(concrete_scale, prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
           conde_options << eq([n1, n2], possible_notes)
         end
         return conde(*conde_options)
@@ -468,7 +468,7 @@ canon_completed_options = MiniKanren.exec do
       # The first should be the root, and find other good ones.
       constraints << eq(n1, current_beat[:root_note])
       conde_options = []
-      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2).map do |possible_notes|
+      find_walking_notes(concrete_scale, current_beat[:root_note], other_beat[:root_note], 2).map do |possible_notes|
         conde_options << eq([n2, n3], possible_notes)
       end
       constraints << conde(*conde_options)
@@ -486,7 +486,7 @@ canon_completed_options = MiniKanren.exec do
       constraints << eq(n4, current_beat[:root_note])
       constraints << project(other_beat, lambda do |prev|
         conde_options = []
-        find_walking_notes(prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
+        find_walking_notes(concrete_scale, prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
           conde_options << eq([n1, n2, n3], possible_notes)
         end
         return conde(*conde_options)
@@ -495,7 +495,7 @@ canon_completed_options = MiniKanren.exec do
       # The first should be the root, and find other good ones.
       constraints << eq(n1, current_beat[:root_note])
       conde_options = []
-      find_walking_notes(current_beat[:root_note], other_beat[:root_note], 3).map do |possible_notes|
+      find_walking_notes(concrete_scale, current_beat[:root_note], other_beat[:root_note], 3).map do |possible_notes|
         conde_options << eq([n2, n3, n4], possible_notes)
       end
       constraints << conde(*conde_options)
@@ -536,7 +536,7 @@ canon_completed_options = MiniKanren.exec do
         # YES (the next beat is in this bar)
         other_beat = canon[i][j + 1]
       end
-      transform_beat(probabilities, constraints, canon[i][j], other_beat, is_last_note)
+      transform_beat(concrete_scale, probabilities, constraints, canon[i][j], other_beat, is_last_note)
     end
   end
 
