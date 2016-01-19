@@ -1,6 +1,6 @@
 # input = [[{root_note: _, rhythm: [_], notes: [_]}, beat2, beat3], [beat1, beat2, beat3], [beat1, beat2, beat3]]
 # TODO: make the canon structure containt the key in this form!
-input_canon = {key: [:c, :minor], canon: [{:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}, {:root_note=>65, :rhythm=>[Rational(1,1)], :notes=>[65]}, {:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}, {:root_note=>72, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[72, 72]}], [{:root_note=>76, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[76, 76]}, {:root_note=>77, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[77, 77]}, {:root_note=>74, :rhythm=>[Rational(1,1)], :notes=>[74]}, {:root_note=>76, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[76, 76]}], [{:root_note=>72, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[72, 72]}, {:root_note=>69, :rhythm=>[Rational(1,1)], :notes=>[69]}, {:root_note=>71, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[71, 67]}, {:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}], [{:root_note=>64, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[64, 64]}, {:root_note=>60, :rhythm=>[Rational(1,1)], :notes=>[60]}, {:root_note=>62, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[62, 60]}, {:root_note=>60, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[60, 60]}]}
+input_canon = {key: [:c, :major], canon: [[{:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}, {:root_note=>65, :rhythm=>[Rational(1,1)], :notes=>[65]}, {:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}, {:root_note=>72, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[72, 72]}], [{:root_note=>76, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[76, 76]}, {:root_note=>77, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[77, 77]}, {:root_note=>74, :rhythm=>[Rational(1,1)], :notes=>[74]}, {:root_note=>76, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[76, 76]}], [{:root_note=>72, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[72, 72]}, {:root_note=>69, :rhythm=>[Rational(1,1)], :notes=>[69]}, {:root_note=>71, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[71, 67]}, {:root_note=>67, :rhythm=>[Rational(1,1)], :notes=>[67]}], [{:root_note=>64, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[64, 64]}, {:root_note=>60, :rhythm=>[Rational(1,1)], :notes=>[60]}, {:root_note=>62, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[62, 60]}, {:root_note=>60, :rhythm=>[Rational(1,2), Rational(1,2)], :notes=>[48, 72]}]]}
 
 def get_lilypond_note(key, note_number)
   # Assume that key is between c4 and b4 and NO ACCIDENTALS and NO COMPLEX key signatures
@@ -10,7 +10,7 @@ def get_lilypond_note(key, note_number)
     # Ones without sharps/flats are all the same
     # Special cases depend on the key
     case note_number % 12
-    # ~~~~ normal notes ~~~~ #
+      # ~~~~ normal notes ~~~~ #
     when 0 # C
       return "c"
     when 2 # D
@@ -25,7 +25,7 @@ def get_lilypond_note(key, note_number)
       return "a"
     when 11 # B
       return "b"
-    # ~~~~ strange ones ~~~~ #
+      # ~~~~ strange ones ~~~~ #
     when 1 # C# / Db
       if [[:fs, :major],[:b, :major],[:e, :major],[:a, :major],[:d, :major]].include?(key)
         # This is C#
@@ -82,27 +82,26 @@ def get_lilypond_note(key, note_number)
   end
 
   def get_note_octave(note_number)
-    return ((note_number / 12) + 1)
+    return ((note_number / 12) - 1)
   end
 
-  def get_lilypond_string(name, octave)
+  def get_adjustment_string(octave)
     octave_adjustment = octave - 4 # Because Lilypond uses octave 4 as a reference
     octave_string = ""
     if octave_adjustment > 0
       for i in 1..octave_adjustment
-        octave_string + "\'"
+        octave_string = octave_string + "\'"
       end
     elsif octave_adjustment < 0
       for i in 1..-octave_adjustment
-        octave_string + ","
+        octave_string = octave_string + ","
       end
     end
-    return name + octave_string
+    return octave_string
   end
 
-  note_name = get_note_name(input_canon[:key], note_number)
-  octave = get_note_octave(note_number)
-  return get_lilypond_string(note_name, octave)
+  note_name = get_note_name(key, note_number)
+  return note_name + get_adjustment_string(get_note_octave(note_number))
 end
 
 
@@ -114,8 +113,8 @@ $lilypond = {
 }
 
 def set_env(canon)
-  $lilypond[:clef] = "treble"
-  $lilypond[:time_sig] = canon[0].length == 3 ? "3/4" : "4/4"
+  $lilypond[:clef] = "bass"
+  $lilypond[:time_sig] = canon[:canon][0].length == 3 ? "3/4" : "4/4"
   $lilypond[:key_sig] = canon[:key]
 end
 
@@ -132,21 +131,32 @@ def add_bar(bar)
 end
 
 def add_beat(beat)
-  beat[:rhythm].zip(beat[:notes]) do |duration, pitch|
-    lilypond_rep = pitch.to_s
-    if duration == 0.25
-      lilypond_rep << "16"
-    elsif duration == 0.5
-      lilypond_rep << "8"
-    elsif duration == 1
-      lilypond_rep << "4"
-    end
+  # Deal with tuplets separately
+  if beat[:rhythm] == [Rational(1,3), Rational(1,3), Rational(1,3)]
+    note1 = get_lilypond_note($lilypond[:key_sig], beat[:notes][0])
+    note2 = get_lilypond_note($lilypond[:key_sig], beat[:notes][1])
+    note3 = get_lilypond_note($lilypond[:key_sig], beat[:notes][2])
+    lilypond_rep = "\\tuplet 3/2 { #{ note1 } #{ note2 } #{ note3 }}"
     $lilypond[:notes] << lilypond_rep
+  else
+    beat[:rhythm].zip(beat[:notes]) do |duration, pitch|
+      lilypond_rep = get_lilypond_note($lilypond[:key_sig], pitch)
+      if duration == Rational(1, 4)
+        lilypond_rep << "16"
+      elsif duration == Rational(1, 2)
+        lilypond_rep << "8"
+      elsif duration == 1
+        lilypond_rep << "4"
+      else
+        puts "Error: unknown duration #{ duration }"
+      end
+      $lilypond[:notes] << lilypond_rep
+    end
   end
 end
 
 def convert_to_lilypond()
-  lp = "\\clef #{ $lilypond[:clef] }\n\\time #{ $lilypond[:time_sig] }\n"
+  lp = "\\clef #{ $lilypond[:clef] }\n\\time #{ $lilypond[:time_sig] }\n\\key #{ $lilypond[:key_sig][0].to_s } \\#{ $lilypond[:key_sig][1].to_s }\n"
   $lilypond[:notes].map do |note|
     lp << "#{ note } "
   end
@@ -154,7 +164,7 @@ def convert_to_lilypond()
 end
 
 set_env(input_canon)
-interpret_canon(input_canon)
+interpret_canon(input_canon[:canon])
 puts $lilypond
-f = File.open("/home/emily/UniWork/3rdYear/Dissertation/GeneratedCanons/test.ly", "w")
+f = File.open("/home/emily/UniWork/3rdYear/Dissertation/GeneratedCanons/test2.ly", "w")
 f.write(convert_to_lilypond())
