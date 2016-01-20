@@ -337,11 +337,16 @@ class Canon
           else
             #TODO: delete this/make it bettttterrr!
             return [
-              [get_note_at_offset(note1, 1), get_note_at_offset(note1, 3)]
+              [note1, note1]
             ]
           end
+        when 3
+          # TODO: Actually implement this!!!
+          return [
+            [note1, note1, note1]
+          ]
         else
-          puts "Error: invalid number of steps. Only 1 or 2 are valid."
+          puts "Error: invalid number of steps. Only 1 or 2 or 3 are valid."
         end
       end
 
@@ -446,6 +451,35 @@ class Canon
           conde_options = []
           find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2).map do |possible_notes|
             conde_options << eq([n2, n3], possible_notes)
+          end
+          constraints << conde(*conde_options)
+        end
+      end
+
+      def transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
+        # Rhythm
+        constraints << eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)])
+        # Pitch
+        n1, n2, n3, n4 = fresh(4)
+        constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
+        if is_last_note
+          # The final one should be the root
+          constraints << eq(n4, current_beat[:root_note])
+          constraints << project(other_beat, lambda do |prev|
+            conde_options = []
+            find_walking_notes(prev[:notes].last, current_beat[:root_note], 3).map do |possible_notes|
+              conde_options << eq([n1, n2, n3], possible_notes)
+              puts possible_notes
+            end
+            return conde(*conde_options)
+          end)
+        else
+          # The first should be the root, and find other good ones.
+          constraints << eq(n1, current_beat[:root_note])
+          conde_options = []
+          find_walking_notes(current_beat[:root_note], other_beat[:root_note], 3).map do |possible_notes|
+            conde_options << eq([n2, n3, n4], possible_notes)
+            puts possible_notes
           end
           constraints << conde(*conde_options)
         end
