@@ -334,6 +334,11 @@ class Canon
               [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
               [note1, get_note_at_offset(note1, 1)]
             ]
+          else
+            #TODO: delete this/make it bettttterrr!
+            return [
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, 3)]
+            ]
           end
         else
           puts "Error: invalid number of steps. Only 1 or 2 are valid."
@@ -415,6 +420,37 @@ class Canon
         end
       end
 
+      def transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
+        # Rhythm
+        constraints << conde(
+        eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
+        eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
+        eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+        )
+        # Pitch
+        n1, n2, n3 = fresh(3)
+        constraints << eq(current_beat[:notes], [n1, n2, n3])
+        if is_last_note
+          # The last should be the root
+          constraints << eq(n3, current_beat[:root_note])
+          constraints << project(other_beat, lambda do |prev|
+            conde_options = []
+            find_walking_notes(prev[:notes].last, current_beat[:root_note], 2).map do |possible_notes|
+              conde_options << eq([n1, n2], possible_notes)
+            end
+            return conde(*conde_options)
+          end)
+        else
+          # The first should be the root, and find other good ones.
+          constraints << eq(n1, current_beat[:root_note])
+          conde_options = []
+          find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2).map do |possible_notes|
+            conde_options << eq([n2, n3], possible_notes)
+          end
+          constraints << conde(*conde_options)
+        end
+      end
+
       ############ ACTAULLY TRANSFORM THE SKELETON ############
       # Initialise canon and constraints
       constraints = []
@@ -456,6 +492,7 @@ class Canon
       q = fresh
       run(1, q, eq(q, canon), *constraints)
       ################################################
+
     end
     @canon_complete = canon_completed_options
   end
