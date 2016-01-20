@@ -387,7 +387,33 @@ class Canon
         constraints << all(eq(current_beat[:rhythm], [Rational(1)]), eq(current_beat[:notes], [current_beat[:root_note]]))
       end
 
-      
+      # Transform the beat into a two notes
+      def transform_beat_double(constraints, current_beat, other_beat, is_last_note)
+        # Rhythm
+        constraints << eq(current_beat[:rhythm], [Rational(1,2), Rational(1,2)])
+        # Pitch
+        n1, n2 = fresh(2)
+        constraints << eq(current_beat[:notes], [n1, n2])
+        if is_last_note
+          # This is the final note of the piece. The second note should be the root and the first a good step to it
+          constraints << eq(n2, current_beat[:root_note])
+          constraints << project(other_beat, lambda do |prev|
+            conde_options = []
+            find_walking_notes(prev[:notes].last, current_beat[:root_note], 1).map do |possible_note|
+              conde_options << eq(n1, possible_note)
+            end
+            return conde(*conde_options)
+          end)
+        else
+          # The first note should be the root, and the second a good step to the next
+          constraints << eq(n1, current_beat[:root_note])
+          conde_options = []
+          find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1).map do |possible_note|
+            conde_options << eq(n2, possible_note)
+          end
+          constraints << conde(*conde_options)
+        end
+      end
 
       ############ ACTAULLY TRANSFORM THE SKELETON ############
       # Initialise canon and constraints
