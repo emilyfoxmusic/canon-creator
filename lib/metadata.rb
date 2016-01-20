@@ -79,12 +79,16 @@ class Metadata
     return @metadata[:chord_progression]
   end
 
+  def get_max_jump()
+    return @metadata[:max_jump]
+  end
+
   def get_number_of_voices()
     return :metadata[:number_of_voices]
   end
 
   def get_beats_in_bar()
-    return get_time_signature() == "3/4" ? 3 else 4
+    return get_time_signature == "3/4" ? 3 : 4
   end
 
 end
