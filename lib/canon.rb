@@ -13,6 +13,10 @@ class Canon
     return @concrete_scale
   end
 
+  def get_metadata()
+    return @metadata
+  end
+
   def get_chord_prog()
     return @metadata.get_chord_progression
   end
