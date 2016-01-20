@@ -49,6 +49,11 @@ class Metadata
     return self
   end
 
+  def probabilities(prob)
+    @metadata[:probabilities] = prob
+    return self
+  end
+
   ##### Getters #####
 
   def get_data()
@@ -84,11 +89,15 @@ class Metadata
   end
 
   def get_number_of_voices()
-    return :metadata[:number_of_voices]
+    return @metadata[:number_of_voices]
   end
 
   def get_beats_in_bar()
     return get_time_signature == "3/4" ? 3 : 4
+  end
+
+  def get_probabilities()
+    return @metadata[:probabilities]
   end
 
 end

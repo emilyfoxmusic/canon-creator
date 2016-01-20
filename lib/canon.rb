@@ -21,6 +21,10 @@ class Canon
     return @canon_skeleton
   end
 
+  def get_canon_complete()
+    return @canon_complete
+  end
+
   def generate_concrete_scale()
     # Find the highest tonic lower than the lower limit
     min_tonic = SonicPi::Note.resolve_midi_note_without_octave(@metadata.get_key_note)
@@ -189,7 +193,7 @@ class Canon
             if b != true && b != false
               raise "BOOOOOM"
             else
-              b
+              true
             end
           end
           ### Return a conde clause of all these options
@@ -218,54 +222,215 @@ class Canon
       end
 
       ## Successive bars do not have the same note for the same position in the chord
-#      def is_different(*vars)
-#        var1, var2, var3, var4 = *vars
-#        if (var4 == nil)
-#          ### Three args
-#          project(var1,
-#          lambda do |var1| project(var2,
-#            lambda do |var2| project(var3,
-#              lambda do |var3|
-#                (var1 != var2 && var1 != var3 && var2 != var3) ? lambda { |x| x } : lambda { |x| nil }
-#              end)
-#            end)
-#          end)
-#        else
-#          ### Four args
-#          project(var1,
-#          lambda do |var1| project(var2,
-#            lambda do |var2| project(var3,
-#              lambda do |var3| project(var4,
-#                lambda do |var4|
-#                  (var1 != var2 && var1 != var3 && var1 != var4 && var2 != var3 && var2 != var4 && var3 != var4) ? lambda { |x| x } : lambda { |x| nil }
-#                end)
-#              end)
-#            end)
-#          end)
-#        end
-#      end
+      #      def is_different(*vars)
+      #        var1, var2, var3, var4 = *vars
+      #        if (var4 == nil)
+      #          ### Three args
+      #          project(var1,
+      #          lambda do |var1| project(var2,
+      #            lambda do |var2| project(var3,
+      #              lambda do |var3|
+      #                (var1 != var2 && var1 != var3 && var2 != var3) ? lambda { |x| x } : lambda { |x| nil }
+      #              end)
+      #            end)
+      #          end)
+      #        else
+      #          ### Four args
+      #          project(var1,
+      #          lambda do |var1| project(var2,
+      #            lambda do |var2| project(var3,
+      #              lambda do |var3| project(var4,
+      #                lambda do |var4|
+      #                  (var1 != var2 && var1 != var3 && var1 != var4 && var2 != var3 && var2 != var4 && var3 != var4) ? lambda { |x| x } : lambda { |x| nil }
+      #                end)
+      #              end)
+      #            end)
+      #          end)
+      #        end
+      #      end
 
       ### Set the notes to be different in every bar for each beat
-#      if @metadata.get_beats_in_bar == 3
-#        for j in 0..@metadata.get_beats_in_bar - 1
-#          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note])
-#        end
-#      else
-#        for j in 0..@metadata.get_beats_in_bar - 1
-#          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note], canon[3][j][:root_note])
-#        end
-#      end
+      #      if @metadata.get_beats_in_bar == 3
+      #        for j in 0..@metadata.get_beats_in_bar - 1
+      #          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note])
+      #        end
+      #      else
+      #        for j in 0..@metadata.get_beats_in_bar - 1
+      #          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note], canon[3][j][:root_note])
+      #        end
+      #      end
 
       # Run the query
       q = fresh
-      run(1, q, eq(q, canon), *constraints)
+      run(50, q, eq(q, canon), *constraints)
     end
 
     # Choose one to be this structure
     @canon_skeleton = canon_structure_options.choose
   end
 
-  def populate_canon(skeleton)
-    raise "Not implemented yet."
+  def populate_canon()
+
+    ### TODO: Less hacky way of getting these variables through!
+    metadata = @metadata
+    concrete_scale = @concrete_scale
+    canon_skeleton = @canon_skeleton
+
+    canon_completed_options = MiniKanren.exec do
+      extend SonicPi::Lang::Core
+      extend SonicPi::RuntimeMethods
+
+      @metadata = metadata
+      @concrete_scale = concrete_scale
+      @canon_skeleton = canon_skeleton
+
+      ##### FUNCTIONS FOR FINDING SPECIFIC NOTES #####
+      # Given two notes, return an array of options for notes that could be used to walk between them in a certain number of steps
+      def find_walking_notes(note1, note2, number_of_steps = 1)
+        difference_in_index = @concrete_scale.index(note1) - @concrete_scale.index(note2)
+        case number_of_steps
+        when 1
+          # Find the median between the notes (both if there are multiple)
+          walking_notes = find_median_note(note1, note2)
+          # Add relevant adjacent notes if they are adjacent or the same
+          if difference_in_index == 0 || difference_in_index == 1
+            walking_notes << get_note_at_offset(note1, 1)
+          end
+          if difference_in_index == 0 || difference_in_index == -1
+            walking_notes << get_note_at_offset(note1, -1)
+          end
+          return walking_notes
+        when 2
+          walking_notes = []
+          # Choose good notes
+          if difference_in_index == 0
+            return [
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, -1)],
+              [get_note_at_offset(note1, -1), get_note_at_offset(note1, 1)]
+            ]
+          elsif difference_in_index == 1
+            return [
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, -2)],
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
+              [get_note_at_offset(note1, -2), get_note_at_offset(note1, -3)]
+            ]
+          elsif difference_in_index == -1
+            return [
+              [get_note_at_offset(note1, -1), get_note_at_offset(note1, 2)],
+              [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
+              [get_note_at_offset(note1, 2), get_note_at_offset(note1, 3)]
+            ]
+          elsif difference_in_index == 2
+            return [
+              [get_note_at_offset(note1, -1), get_note_at_offset(note1, -3)],
+              [get_note_at_offset(note1, -3), get_note_at_offset(note1, -1)],
+              [get_note_at_offset(note1, -1), get_note_at_offset(note1, -2)],
+              [note1, get_note_at_offset(note1, -1)]
+            ]
+          elsif difference_in_index == -2
+            return [
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, 3)],
+              [get_note_at_offset(note1, 3), get_note_at_offset(note1, 1)],
+              [get_note_at_offset(note1, 1), get_note_at_offset(note1, 2)],
+              [note1, get_note_at_offset(note1, 1)]
+            ]
+          end
+        else
+          puts "Error: invalid number of steps. Only 1 or 2 are valid."
+        end
+      end
+
+      def find_median_note(note1, note2)
+        index_1 = @concrete_scale.index(note1)
+        index_2 = @concrete_scale.index(note2)
+        median_index = (index_1 + index_2) / 2.0
+        lower_median = @concrete_scale[median_index.floor]
+        upper_median = @concrete_scale[median_index.ceil]
+        if lower_median == upper_median
+          return [lower_median]
+        else
+          return [lower_median, upper_median]
+        end
+      end
+
+      # Given a note, return the note at that offset in the scale
+      def get_note_at_offset(note, offset)
+        index = @concrete_scale.index(note)
+        index = index + offset
+        return @concrete_scale[index]
+      end
+      ################################################
+
+      ########### TRANSFORMATION FUNCTIONS ###########
+      # Transform this beat into a more interesting melody, taking into account the previous beat if this is the last one in the piece, or the next beat otherwise
+      # v1.0 supports up to a four way split
+      # The logic does not supply every option for every variable else it would be too inefficient. Rhythm is hardcoded in v1.0, based on the random variable
+      def transform_beat(constraints, current_beat, other_beat, is_last_note)
+        probabilities = @metadata.get_probabilities
+
+        fate = rand()
+        if fate < probabilities[0]
+          transform_beat_single(constraints, current_beat)
+        elsif fate < probabilities[0] + probabilities[1]
+          transform_beat_double(constraints, current_beat, other_beat, is_last_note)
+        elsif fate < probabilities[0] + probabilities[1] + probabilities[2]
+          transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
+        else
+          transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
+        end
+
+      end
+
+      # Transform beat into a single note
+      def transform_beat_single(constraints, current_beat)
+        # This note should be the root
+        constraints << all(eq(current_beat[:rhythm], [Rational(1)]), eq(current_beat[:notes], [current_beat[:root_note]]))
+      end
+
+      
+
+      ############ ACTAULLY TRANSFORM THE SKELETON ############
+      # Initialise canon and constraints
+      constraints = []
+      canon = @canon_skeleton
+
+      # Make the notes into fresh variables
+      for i in 0..canon.length - 1
+        for j in 0..canon[i].length - 1
+          canon[i][j][:rhythm] = fresh
+          canon[i][j][:notes] = fresh
+        end
+      end
+
+      # Transform all the beats
+      for i in 0..canon.length - 1
+        for j in 0..canon[i].length - 1
+          other_beat = nil
+          is_last_note = false
+          # is the next beat in this bar?
+          if j == canon[i].length - 1
+            # NO, is it in the next?
+            if i == canon.length - 1
+              # NO (there is no next beat- this is the final beat)
+              other_beat = canon[i][j - 1]
+              is_last_note = true
+            else
+              # YES (the next beat is the first beat of the next bar)
+              other_beat = canon[i + 1][0]
+            end
+          else
+            # YES (the next beat is in this bar)
+            other_beat = canon[i][j + 1]
+          end
+          transform_beat(constraints, canon[i][j], other_beat, is_last_note)
+        end
+      end
+
+      # run the query using q, a fresh query variable
+      q = fresh
+      run(1, q, eq(q, canon), *constraints)
+      ################################################
+    end
+    @canon_complete = canon_completed_options
   end
 end
