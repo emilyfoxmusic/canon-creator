@@ -532,6 +532,6 @@ class Canon
       ################################################
 
     end
-    @canon_complete = canon_completed_options
+    @canon_complete = canon_completed_options.choose
   end
 end

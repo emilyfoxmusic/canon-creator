@@ -4,7 +4,7 @@ input_canon = {key: [:c, :major], canon: [[{:root_note=>67, :rhythm=>[Rational(1
 
 def get_lilypond_note(key, note_number)
   # Assume that key is between c4 and b4 and NO ACCIDENTALS and NO COMPLEX key signatures
-  # Only MAJOR KEYS TODO: Implement minors
+  # TODO: make the keys correct
 
   def get_note_name(key, note_number)
     # Arrays with the keys that contain that note.
