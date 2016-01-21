@@ -31,7 +31,7 @@ class Canon
 
   def generate_concrete_scale()
     # Find the highest tonic lower than the lower limit
-    min_tonic = SonicPi::Note.resolve_midi_note_without_octave(@metadata.get_key_note)
+    min_tonic = SonicPi::Note.resolve_midi_note(@metadata.get_key_note)
     lowest_note = SonicPi::Note.resolve_midi_note(@metadata.get_lowest_note)
     while lowest_note < min_tonic
       min_tonic -= 12
