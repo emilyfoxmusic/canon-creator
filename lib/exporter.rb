@@ -389,8 +389,28 @@ class Exporter
       end
     end
 
+    def convert_key_note_to_lilypond(note)
+      lp_note = note.to_s
+      if lp_note[0,1] == "b"
+        # Deal separately- can't just do a blind replace.
+        case lp_note
+        when "b"
+          return "b"
+        when "bb"
+          return "bes"
+        when "bs"
+          return "bs"
+        else
+          raise "Unknown note #{ note }"
+        end
+      else
+        lp_note.sub!(/s/, "is")
+        lp_note.sub!(/b/, "es")
+      end
+    end
+
     def convert_to_lilypond()
-      lp = "\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ @key_sig_note.to_s } \\#{ @key_sig_type.to_s }\n"
+      lp = "\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ convert_key_note_to_lilypond(@key_sig_note) } \\#{ @key_sig_type.to_s }\n"
       @notes.map do |note|
         lp << "#{ note } "
       end
@@ -401,6 +421,7 @@ class Exporter
     interpret_canon()
     f = File.open(@file_loc, "w")
     f.write(convert_to_lilypond())
+    f.close
 
   end
 
