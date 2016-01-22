@@ -15,9 +15,25 @@ class Metadata
 
   # Set the tonic of the key. Octaves must NOT be specified.
   def key_note(note)
-    valid_keys = [:c, :cs, :db, :d, :ds, :eb, :e, :f, :fs, :gb, :g, :gs, :ab, :a, :as, :bb]
+    valid_keys = [:cb, :b, :c, :cs, :db, :d, :ds, :eb, :e, :f, :fs, :gb, :g, :gs, :ab, :a, :as, :bb]
     if valid_keys.include?(note)
-      @metadata[:key_note] = note
+      if @metadata[:key_type] == nil
+        @metadata[:key_note] = note
+      elsif @metadata[:key_type] == :major
+        if note != :gs && note != :ds && note != :as
+          @metadata[:key_note] = note
+        else
+          raise "Key note #{ note } not valid for a #{ @metadata[:key_type] } key."
+        end
+      elsif @metadata[:key_type] == :minor
+        if note != :cb || note != :gb || note != :db
+          @metadata[:key_note] = note
+        else
+          raise "Key note #{ note } not valid for a #{ @metadata[:key_type] } key."
+        end
+      else
+        raise "Invalid key type."
+      end
     else
       raise "The key: #{ note } is not valid."
     end
@@ -28,7 +44,13 @@ class Metadata
   def key_type(type)
     valid_types = [:major, :minor]
     if valid_types.include?(type)
-      @metadata[:key_type] = type
+      if type == :minor && (@metadata[:key_note] == :cb || @metadata[:key_note] == :gb || @metadata[:key_note] == :db)
+        raise "Key note #{ @metadata[:key_note] } not valid for a #{ type } key."
+      elsif type == :major && (@metadata[:key_note] == :gs || @metadata[:key_note] == :ds || @metadata[:key_note] == :as)
+        raise "Key note #{ @metadata[:key_note] } not valid for a #{ type } key."
+      else
+        @metadata[:key_type] = type
+      end
     else
       raise "The type of key: #{ type } is not supported."
     end
@@ -158,8 +180,19 @@ class Metadata
 
   # Get the tonic note. Set one at random if not specified.
   def get_key_note()
-    if @metadata[:key_note] == nil
-      self.key_note([:c, :cs, :db, :d, :ds, :eb, :e, :f, :fs, :gb, :g, :gs, :ab, :a, :as, :bb].choose)
+    if @metadata[:key_type] == nil
+      if @metadata[:key_note] == nil
+        self.key_note([:cb, :b, :c, :cs, :db, :d, :ds, :eb, :e, :f, :fs, :gb, :g, :gs, :ab, :a, :as, :bb].choose)
+      else
+        # The note picked must be compatible with the key type!
+        if @metadata[:key_type] == :major
+          self.key_note([:c, :g, :d, :a, :e, :b, :cb, :fs, :gb, :db, :cs, :ab, :eb, :bb, :f].choose)
+        elsif @metadata[:key_type] == :minor
+          self.key_note([:a, :e, :b, :fs, :cs, :gs, :ab, :ds, :eb, :bb, :as, :f, :c, :g, :d].choose)
+        else
+          raise "Invalid key type: #{ @metadata[:key_type] }"
+        end
+      end
     end
     return @metadata[:key_note]
   end
@@ -167,7 +200,14 @@ class Metadata
   # Get the type of key. Set one at random if not specified.
   def get_key_type()
     if @metadata[:key_type] == nil
-      self.key_type([:major, :minor].choose)
+      # Choose a compatible type for the note already chosen (if there is one).
+      if @metadata[:key_note] == :cb || @metadata[:key_type] == :gb || @metadata[:key_type] == :db
+        self.key_type(:major)
+      elsif @metadata[:key_type] == :gs || @metadata[:key_type] == :ds || @metadata[:key_type] == :as
+        self.key_type(:minor)
+      else
+        self.key_type([:major, :minor].choose)
+      end
     end
     return @metadata[:key_type]
   end

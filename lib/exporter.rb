@@ -12,93 +12,316 @@ class Exporter
   end
 
   def get_lilypond_note(note_number)
-    # Assume that key is between c4 and b4 and NO ACCIDENTALS and NO COMPLEX key signatures
-    # TODO: make the keys correct and all (even normal notes) options- full keys support
+    # Assuming NO ACCIDENTALS and NO COMPLEX key signatures
 
     # Find the name of the note in this key
     def get_note_name(note_number)
       # Arrays with the keys that contain that note.
-      c_sharp_keys = [[:fs, :major], [:b, :major], [:e, :major], [:a, :major], [:d, :major], [:b, :minor], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
-      d_flat_keys = [[:ab, :major], [:db, :major], [:gb, :major], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
-      d_sharp_keys = [[:fs, :major],[:b, :major],[:e, :major], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
-      e_flat_keys = [[:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:g, :minor], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
-      f_sharp_keys = [[:fs, :major],[:b, :major],[:e, :major],[:a, :major],[:d, :major], [:g, :major], [:e, :minor], [:b, :minor], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
-      g_flat_keys = [[:db, :major], [:gb, :major], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
-      g_sharp_keys = [[:fs, :major], [:b, :major], [:e, :major], [:a, :major], [:fs, :minor], [:cs, :minor], [:gs, :minor], [:ds, :minor], [:as, :minor]]
-      a_flat_keys = [[:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
-      a_sharp_keys = [[:fs, :major],[:b, :major], [:gs, :minor], [:ds, :minor], [:as, :minor]]
-      b_flat_keys = [[:f, :major], [:bb, :major], [:eb, :major], [:ab, :major], [:db, :major], [:gb, :major], [:d, :minor], [:g, :minor], [:c, :minor], [:f, :minor], [:bb, :minor], [:eb, :minor], [:ab, :minor]]
-      # Ones without sharps/flats are all the same
-      # Special cases depend on the key
+      c_keys_major = [:db, :ab, :eb, :bb, :f, :c, :g]
+      c_keys_minor = [:bb, :f, :c, :g, :d, :a, :e]
+
+      b_sharp_keys_major = [:cs]
+      b_sharp_keys_minor = [:as]
+
+      c_sharp_keys_major = [:d, :a, :e, :b, :fs, :cs]
+      c_sharp_keys_minor = [:b, :fs, :cs, :gs, :ds, :as]
+
+      d_flat_keys_major = [:ab, :db, :gb, :cb]
+      d_flat_keys_minor = [:f, :bb, :eb, :ab]
+
+      d_keys_major = [:eb, :bb, :f, :c, :g, :d, :a]
+      d_keys_minor = [:c, :g, :d, :a, :e, :b, :fs]
+
+      d_sharp_keys_major = [:e, :b, :fs, :cs]
+      d_sharp_keys_minor = [:cs, :gs, :ds, :as]
+
+      e_flat_keys_major = [:bb, :eb, :ab, :db, :gb, :cb]
+      e_flat_keys_minor = [:g, :c, :f, :bb, :eb, :ab]
+
+      e_keys_major = [:f, :c, :g, :d, :a, :e, :b]
+      e_keys_minor = [:d, :a, :e, :b, :fs, :cs, :gs]
+
+      f_flat_keys_major = [:cb]
+      f_flat_keys_minor = [:ab]
+
+      f_keys_major = [:gb, :db, :ab, :eb, :bb, :f, :c]
+      f_keys_minor = [:eb, :bb, :f, :c, :g, :d, :a]
+
+      e_sharp_keys_major = [:fs, :cs]
+      e_sharp_keys_minor = [:ds, :as]
+
+      f_sharp_keys_major = [:g, :d, :a, :e, :b, :fs, :cs]
+      f_sharp_keys_minor = [:e, :b, :fs, :cs, :gs, :ds, :as]
+
+      g_flat_keys_major = [:db, :gb, :cb]
+      g_flat_keys_minor = [:bb, :eb, :ab]
+
+      g_keys_major = [:ab, :eb, :bb, :f, :c, :g, :d]
+      g_keys_minor = [:f, :c, :g, :d, :a, :e, :b]
+
+      g_sharp_keys_major = [:a, :e, :b, :fs, :cs]
+      g_sharp_keys_minor = [:fs, :cs, :gs, :ds, :as]
+
+      a_flat_keys_major = [:eb, :ab, :db, :gb, :cb]
+      a_flat_keys_minor = [:c, :f, :bb, :eb, :ab]
+
+      a_keys_major = [:bb, :f, :c, :g, :d, :a, :e]
+      a_keys_minor = [:g, :d, :a, :e, :b, :fs, :cs]
+
+      a_sharp_keys_major = [:b, :fs, :cs]
+      a_sharp_keys_minor = [:gs, :ds, :as]
+
+      b_flat_keys_major = [:f, :bb, :eb, :ab, :db, :gb, :cb]
+      b_flat_keys_minor = [:d, :g, :c, :f, :bb, :eb, :ab]
+
+      b_keys_major = [:c, :g, :d, :a, :e, :b, :fs]
+      b_keys_minor = [:a, :e, :b, :fs, :cs, :gs, :ds]
+
+      c_flat_keys_major = [:gb, :cb]
+      c_flat_keys_minor = [:eb, :ab]
+
+      # Return the right note for the key.
       case note_number % 12
-        # ~~~~ normal notes ~~~~ #
-      when 0 # C
-        return "c"
-      when 2 # D
-        return "d"
-      when 4 # E
-        return "e"
-      when 5 # F
-        return "f"
-      when 7 # G
-        return "g"
-      when 9 # A
-        return "a"
-      when 11 # B
-        return "b"
-        # ~~~~ strange ones ~~~~ #
-      when 1 # C# / Db
-        if c_sharp_keys.include?([@key_sig_note, @key_sig_type])
-          # This is C#
-          return "cis"
-        elsif d_flat_keys.include?([@key_sig_note, @key_sig_type])
-          # This is Db
-          return "des"
+      when 0 # C / B#
+        if @key_sig_type == :major
+          if c_keys_major.include?(@key_sig_note)
+            return "c"
+          elsif b_sharp_keys_major.include?(@key_sig_note)
+            return "bis"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if c_keys_minor.include?(@key_sig_note)
+            return "c"
+          elsif b_sharp_keys_minor.include?(@key_sig_note)
+            return "bis"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
         else
-          raise "Note #{ note_number } not in the key #{ @key_sig_note } #{ @key_sig_type }!"
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 1 # C# / Db
+        if @key_sig_type == :major
+          if c_sharp_keys_major.include?(@key_sig_note)
+            return "cis"
+          elsif d_flat_keys_major.include?(@key_sig_note)
+            return "des"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if c_sharp_keys_minor.include?(@key_sig_note)
+            return "cis"
+          elsif d_flat_keys_minor.include?(@key_sig_note)
+            return "des"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 2 # D
+        if @key_sig_type == :major
+          if d_keys_major.include?(@key_sig_note)
+            return "d"
+          else
+            raise "Note #{ note_number } not in key."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if d_keys_minor.include?(@key_sig_note)
+            return "d"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
         end
       when 3 # D# / Eb
-        if d_sharp_keys.include?([@key_sig_note, @key_sig_type])
-          # This is D#
-          return "dis"
-        elsif e_flat_keys.include?([@key_sig_note, @key_sig_type])
-          # This is Eb
-          return "ees"
+        if @key_sig_type == :major
+          if d_sharp_keys_major.include?(@key_sig_note)
+            return "dis"
+          elsif e_flat_keys_major.include?(@key_sig_note)
+            return "ees"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if d_sharp_keys_minor.include?(@key_sig_note)
+            return "dis"
+          elsif e_flat_keys_minor.include?(@key_sig_note)
+            return "ees"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
         else
-          raise "Note #{ note_number } not in the key #{ @key_sig_note } #{ @key_sig_type }!"
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 4 # E / Fb
+        if @key_sig_type == :major
+          if e_keys_major.include?(@key_sig_note)
+            return "e"
+          elsif f_flat_keys_major.include?(@key_sig_note)
+            return "fes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if e_keys_minor.include?(@key_sig_note)
+            return "e"
+          elsif f_flat_keys_minor.include?(@key_sig_note)
+            return "fes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 5 # F / E#
+        if @key_sig_type == :major
+          if f_keys_major.include?(@key_sig_note)
+            return "f"
+          elsif e_sharp_keys_major.include?(@key_sig_note)
+            return "eis"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if f_keys_minor.include?(@key_sig_note)
+            return "f"
+          elsif e_sharp_keys_minor.include?(@key_sig_note)
+            return "eis"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
         end
       when 6 # F# / Gb
-        if f_sharp_keys.include?([@key_sig_note, @key_sig_type])
-          # This is F#
-          return "fis"
-        elsif g_flat_keys.include?([@key_sig_note, @key_sig_type])
-          # This is Gb
-          return "ges"
+        if @key_sig_type == :major
+          if f_sharp_keys_major.include?(@key_sig_note)
+            return "fis"
+          elsif g_flat_keys_major.include?(@key_sig_note)
+            return "ges"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if f_sharp_keys_minor.include?(@key_sig_note)
+            return "fis"
+          elsif g_flat_keys_minor.include?(@key_sig_note)
+            return "ges"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
         else
-          raise "Note #{ note_number } not in the key #{ @key_sig_note } #{ @key_sig_type }!"
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 7 # G
+        if @key_sig_type == :major
+          if g_keys_major.include?(@key_sig_note)
+            return "g"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if g_keys_minor.include?(@key_sig_note)
+            return "g"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
         end
       when 8 # G# / Ab
-        if g_sharp_keys.include?([@key_sig_note, @key_sig_type])
-          # This is G#
-          return "gis"
-        elsif a_flat_keys.include?([@key_sig_note, @key_sig_type])
-          # This is Ab
-          return "aes"
+        if @key_sig_type == :major
+          if g_sharp_keys_major.include?(@key_sig_note)
+            return "gis"
+          elsif a_flat_keys_major.include?(@key_sig_note)
+            return "aes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if g_sharp_keys_minor.include?(@key_sig_note)
+            return "gis"
+          elsif a_flat_keys_minor.include?(@key_sig_note)
+            return "aes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
         else
-          raise "Note #{ note_number } not in the key #{ @key_sig_note } #{ @key_sig_type }!"
+          raise "Invalid key type #{ @key_sig_type }"
+        end
+      when 9 # A
+        if @key_sig_type == :major
+          if a_keys_major.include?(@key_sig_note)
+            return "a"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if a_keys_minor.include?(@key_sig_note)
+            return "a"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
         end
       when 10 # A# / Bb
-        if a_sharp_keys.include?([@key_sig_note, @key_sig_type])
-          # This is A#
-          return "ais"
-        elsif b_flat_keys.include?([@key_sig_note, @key_sig_type])
-          # This is Bb
-          return "bes"
+        if @key_sig_type == :major
+          if a_sharp_keys_major.include?(@key_sig_note)
+            return "ais"
+          elsif b_flat_keys_major.include?(@key_sig_note)
+            return "bes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if a_sharp_keys_minor.include?(@key_sig_note)
+            return "ais"
+          elsif b_flat_keys_minor.include?(@key_sig_note)
+            return "bes"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
         else
-          raise "Note #{ note_number } not in the key #{ @key_sig_note } #{ @key_sig_type }!"
+          raise "Invalid key type #{ @key_sig_type }"
         end
-      else
-        raise "Something went wrong finding the note for the note number #{ note_number } in key #{ @key_sig_note } #{ @key_sig_type }"
+      when 11 # B / Cb
+        if @key_sig_type == :major
+          if b_keys_major.include?(@key_sig_note)
+            return "b"
+          elsif c_flat_keys_major.include?(@key_sig_note)
+            return "ces"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        elsif @key_sig_type == :minor
+          # Minor
+          if b_keys_minor.include?(@key_sig_note)
+            return "b"
+          elsif c_flat_keys_minor.include?(@key_sig_note)
+            return "ces"
+          else
+            raise "Note #{ note_number } not in key #{ @key_sig_note } #{ @key_sig_type }."
+          end
+        else
+          raise "Invalid key type #{ @key_sig_type }"
+        end
       end
     end
 
