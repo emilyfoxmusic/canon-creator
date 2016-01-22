@@ -50,10 +50,14 @@ class Metadata
   # There must be a range of at least an octave.
   def lowest_note(note)
     note_number = SonicPi::Note.resolve_midi_note(note)
-    if @metadata[:highest_note] != nil && note_number <= @metadata[:highest_note] - 12
-      @metadata[:lowest_note] = note
+    if @metadata[:highest_note] != nil
+      if note_number <= SonicPi::Note.resolve_midi_note(@metadata[:highest_note]) - 12
+        @metadata[:lowest_note] = note
+      else
+        raise "The range must cover one octave, minimum."
+      end
     else
-      raise "The range must cover one octave, minimum."
+      @metadata[:lowest_note] = note
     end
     return self
   end
@@ -62,10 +66,14 @@ class Metadata
   # There must be a range of at least an octave.
   def highest_note(note)
     note_number = SonicPi::Note.resolve_midi_note(note)
-    if @metadata[:lowest_note] != nil && note_number >= @metadata[:highest_note] + 12
-      @metadata[:highest_note] = note
+    if @metadata[:lowest_note] != nil
+      if note_number >= SonicPi::Note.resolve_midi_note(@metadata[:lowest_note]) + 12
+        @metadata[:highest_note] = note
+      else
+        raise "The range must cover one octave, minimum."
+      end
     else
-      raise "The range must cover one octave, minimum."
+      @metadata[:highest_note] = note
     end
     return self
   end
