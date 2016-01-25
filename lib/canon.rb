@@ -185,20 +185,13 @@ class Canon
       end
 
       def constrain_to_key_and_distance(current_beat_var, next_beat_var, chord_name)
-
         max_jump = @metadata.get_max_jump
-        #puts max_jump
 
         ### Get all notes in the right chord then keep only those not too far from the next beat
         possible_notes = notes_in_chord(chord_name)
         project(next_beat_var, lambda do |next_beat|
           refined_possibilities = possible_notes.select do |note|
-            b = (note - next_beat).abs <= max_jump #&& (note - next_beat).abs != 0
-            if b != true && b != false
-              raise "BOOOOOM"
-            else
-              true
-            end
+            (note - next_beat).abs <= max_jump #&& (note - next_beat).abs != 0
           end
           ### Return a conde clause of all these options
           conde_options = []
