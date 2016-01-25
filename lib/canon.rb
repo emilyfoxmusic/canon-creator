@@ -184,14 +184,14 @@ class Canon
         end
       end
 
-      def constrain_to_key_and_distance(current_beat_var, next_beat_var, chord_name)
+      def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
         max_jump = @metadata.get_max_jump
 
         ### Get all notes in the right chord then keep only those not too far from the next beat
         possible_notes = notes_in_chord(chord_name)
         project(next_beat_var, lambda do |next_beat|
           refined_possibilities = possible_notes.select do |note|
-            (note - next_beat).abs <= max_jump #&& (note - next_beat).abs != 0
+            (note - next_beat).abs <= max_jump && (note - next_beat).abs != 0 && !unavailable_notes.include?(note)
           end
           ### Return a conde clause of all these options
           conde_options = []
@@ -207,55 +207,21 @@ class Canon
         (canon[bar].length - 1).downto(0) do |beat|
           ### No constraint for the final beat
           if !(bar == canon.length - 1 && beat == canon[bar].length - 1)
+            ### Find the note variables used in this place in other bars- we can't use the same one.
+            used_notes_in_this_position = []
+            for i in bar..canon.length - 1
+              used_notes_in_this_position << canon[i][beat][:root_note]
+            end
             if beat < canon[bar].length - 1
               ### Next beat is in the same bar
-              constraints << constrain_to_key_and_distance(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat])
+              constraints << constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
             else
               ### Next beat is in the next bar
-              constraints << constrain_to_key_and_distance(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat])
+              constraints << constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
             end
           end
         end
       end
-
-      ## Successive bars do not have the same note for the same position in the chord
-      #      def is_different(*vars)
-      #        var1, var2, var3, var4 = *vars
-      #        if (var4 == nil)
-      #          ### Three args
-      #          project(var1,
-      #          lambda do |var1| project(var2,
-      #            lambda do |var2| project(var3,
-      #              lambda do |var3|
-      #                (var1 != var2 && var1 != var3 && var2 != var3) ? lambda { |x| x } : lambda { |x| nil }
-      #              end)
-      #            end)
-      #          end)
-      #        else
-      #          ### Four args
-      #          project(var1,
-      #          lambda do |var1| project(var2,
-      #            lambda do |var2| project(var3,
-      #              lambda do |var3| project(var4,
-      #                lambda do |var4|
-      #                  (var1 != var2 && var1 != var3 && var1 != var4 && var2 != var3 && var2 != var4 && var3 != var4) ? lambda { |x| x } : lambda { |x| nil }
-      #                end)
-      #              end)
-      #            end)
-      #          end)
-      #        end
-      #      end
-
-      ### Set the notes to be different in every bar for each beat
-      #      if @metadata.get_beats_in_bar == 3
-      #        for j in 0..@metadata.get_beats_in_bar - 1
-      #          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note])
-      #        end
-      #      else
-      #        for j in 0..@metadata.get_beats_in_bar - 1
-      #          constraints << is_different(canon[0][j][:root_note], canon[1][j][:root_note], canon[2][j][:root_note], canon[3][j][:root_note])
-      #        end
-      #      end
 
       # Run the query
       q = fresh
