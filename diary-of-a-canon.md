@@ -124,4 +124,5 @@ TO DO: Sort out which keys are supported and make sure the exporter supports the
 #### Date: January 26th 2016
 I FINALLY FIXED THE STUPID BUG! Turns out it was my fault- I had not considered when there were no options for refined notes- it would set no constraints and then blow up rather than failing which it needed to do.
 
-TO DO: Make the final note the tonic.
+TO DO: Make the final note the tonic. DONE
+TO DO: Fix bug with c flats being an octave low when exported!

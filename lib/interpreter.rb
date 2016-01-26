@@ -1,6 +1,8 @@
 # This class plays a canon in Sonic Pi.
 
 class Interpreter
+  include SonicPi::Lang::Core
+  include SonicPi::RuntimeMethods
 
   def initialize(canon)
       @canon = canon
@@ -40,7 +42,7 @@ class Interpreter
       num_beats = @canon.get_metadata.get_beats_in_bar
       num_beats.times do
         puts "new"
-        SonicPi::in_thread do
+        in_thread do
           play_melody(canon)
         end
         sleep num_beats

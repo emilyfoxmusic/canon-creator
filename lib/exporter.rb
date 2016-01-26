@@ -370,7 +370,7 @@ class Exporter
         note1 = get_lilypond_note(beat[:notes][0])
         note2 = get_lilypond_note(beat[:notes][1])
         note3 = get_lilypond_note(beat[:notes][2])
-        lilypond_rep = "\\tuplet 3/2 { #{ note1 } #{ note2 } #{ note3 }}"
+        lilypond_rep = "\\tuplet 3/2 { #{ note1 }8 #{ note2 } #{ note3 }}"
         @notes << lilypond_rep
       else
         beat[:rhythm].zip(beat[:notes]) do |duration, pitch|
@@ -406,6 +406,7 @@ class Exporter
       else
         lp_note.sub!(/s/, "is")
         lp_note.sub!(/b/, "es")
+        return lp_note
       end
     end
 

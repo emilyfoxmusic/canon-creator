@@ -250,7 +250,7 @@ class Canon
 
       # Run the query
       q = fresh
-      run(50, q, eq(q, canon), *constraints)
+      run(1000, q, eq(q, canon), *constraints)
     end
 
     # Choose one to be this structure
@@ -289,17 +289,13 @@ class Canon
         end
 
         note1_index = @concrete_scale.index(note1)
-        puts note1_index
         note2_index = @concrete_scale.index(note2)
-        puts note2_index
         difference_in_index = note1_index - note2_index
-        puts "diff = " + difference_in_index.to_s
         if note1_index < note2_index
           note_walk = choose_n(@concrete_scale[note1_index..note2_index], number_of_steps).sort
         else
           note_walk = choose_n(@concrete_scale[note2_index..note1_index], number_of_steps).sort
         end
-        puts "notewalk " + note_walk.to_s
         return note_walk
       end
 
@@ -432,11 +428,10 @@ class Canon
 
       # run the query using q, a fresh query variable
       q = fresh
-      run(1, q, eq(q, canon), *constraints)
+      run(1000, q, eq(q, canon), *constraints)
       ################################################
 
     end
-    puts canon_completed_options
     @canon_complete = canon_completed_options.choose
   end
 end
