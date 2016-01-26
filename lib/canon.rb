@@ -186,9 +186,10 @@ class Canon
 
       def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
 
-        # If the next note is nil, just constrain to possible notes
+        # If the next note is nil, this is the last so we must have a tonic note.
         if next_beat_var == nil
-          possible_notes = notes_in_chord(chord_name)
+          mod_tonic = SonicPi::Note.resolve_midi_note(@metadata.get_key_note) % 12
+          possible_notes = notes_in_chord(chord_name).select { |note| note % 12 == mod_tonic }
           conde_options = []
           possible_notes.map do |note|
             conde_options << eq(current_beat_var, note)
