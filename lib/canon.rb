@@ -185,20 +185,39 @@ class Canon
       end
 
       def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
+
+        # If the next note is nil, just constrain to possible notes
+        if next_beat_var == nil
+          possible_notes = notes_in_chord(chord_name)
+          conde_options = []
+          possible_notes.map do |note|
+            conde_options << eq(current_beat_var, note)
+          end
+          return conde(*conde_options)
+        end
+
         max_jump = @metadata.get_max_jump
 
         ### Get all notes in the right chord then keep only those not too far from the next beat
         possible_notes = notes_in_chord(chord_name)
-        project(next_beat_var, lambda do |next_beat|
-          refined_possibilities = possible_notes.select do |note|
-            (note - next_beat).abs <= max_jump && (note - next_beat).abs != 0 && !unavailable_notes.include?(note)
-          end
-          ### Return a conde clause of all these options
-          conde_options = []
-          refined_possibilities.map do |note|
-            conde_options << eq(current_beat_var, note)
-          end
-          return conde(*conde_options)
+        return project(next_beat_var, lambda do |next_beat|
+          project(unavailable_notes, lambda do |unavailable_notes|
+            refined_possibilities = possible_notes
+            refined_possibilities = possible_notes.select do |note|
+              (note - next_beat).abs <= max_jump && (note - next_beat).abs != 0 && !unavailable_notes.include?(note)
+            end
+
+            ### Return a conde clause of all these options unless there are none, in which case fail.
+            if refined_possibilities.empty?
+              lambda { |x| nil }
+            else
+              conde_options = []
+              refined_possibilities.map do |note|
+                conde_options << eq(current_beat_var, note)
+              end
+              conde(*conde_options)
+            end
+          end)
         end)
       end
 
@@ -206,18 +225,23 @@ class Canon
       (canon.length - 1).downto(0) do |bar|
         (canon[bar].length - 1).downto(0) do |beat|
           ### No constraint for the final beat
-          if !(bar == canon.length - 1 && beat == canon[bar].length - 1)
+          if (bar == canon.length - 1 && beat == canon[bar].length - 1)
+            # This is the final note of the piece- it doesn't have a next beat
+            constraints << constrain_to_possible_notes(canon[bar][beat][:root_note], nil, @metadata.get_chord_progression[beat], [])
+          else
             ### Find the note variables used in this place in other bars- we can't use the same one.
             used_notes_in_this_position = []
-            for i in bar..canon.length - 1
+            for i in (bar + 1)..canon.length - 1
               used_notes_in_this_position << canon[i][beat][:root_note]
             end
             if beat < canon[bar].length - 1
               ### Next beat is in the same bar
-              constraints << constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+              new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+              constraints << new_constraint
             else
               ### Next beat is in the next bar
-              constraints << constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+              new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+              constraints << new_constraint
             end
           end
         end
@@ -229,7 +253,11 @@ class Canon
     end
 
     # Choose one to be this structure
-    @canon_skeleton = canon_structure_options.choose
+    if canon_structure_options.empty?
+      raise "No canons available for these settings."
+    else
+      @canon_skeleton = canon_structure_options.choose
+    end
   end
 
   def populate_canon()
