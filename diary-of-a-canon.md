@@ -120,3 +120,8 @@ TO DO: Tidy up the exporter by taking the keys off into separate arrays at the t
 
 #### Date: January 19th 2016
 TO DO: Sort out which keys are supported and make sure the exporter supports them all properly. Make it so that the user note is not deleted by replacing with a number.
+
+#### Date: January 26th 2016
+I FINALLY FIXED THE STUPID BUG! Turns out it was my fault- I had not considered when there were no options for refined notes- it would set no constraints and then blow up rather than failing which it needed to do.
+
+TO DO: Make the final note the tonic.
