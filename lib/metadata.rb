@@ -275,9 +275,9 @@ class Metadata
   def get_key_type()
     if @metadata[:key_type] == nil
       # Choose a compatible type for the note already chosen (if there is one).
-      if @metadata[:key_note] == :cb || @metadata[:key_type] == :gb || @metadata[:key_type] == :db
+      if @metadata[:key_note] == :cb || @metadata[:key_note] == :gb || @metadata[:key_note] == :db
         self.key_type(:major)
-      elsif @metadata[:key_type] == :gs || @metadata[:key_type] == :ds || @metadata[:key_type] == :as
+      elsif @metadata[:key_note] == :gs || @metadata[:key_note] == :ds || @metadata[:key_note] == :as
         self.key_type(:minor)
       else
         # No constraint- choose any. (Both are valid for this key note).
@@ -295,7 +295,7 @@ class Metadata
     # If there isn't a time signature chosen, then generate one.
     if @metadata[:time_sig] == nil
       # Ensure it's compatible with the chord progression.
-      if @metadata.get_chord_progression == nil
+      if get_chord_progression == nil
         self.time_signature(["3/4", "4/4"].choose)
       elsif @metadata.get_chord_progression.length == 3
         self.time_signature("3/4")
