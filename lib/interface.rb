@@ -14,7 +14,6 @@ define :canon do
   return Metadata.new()
 end
 
-
 # ARGS: Metadata object.
 # DESCRIPTION: Generates a complete canon and plays it.
 # RETURNS: Nil.
