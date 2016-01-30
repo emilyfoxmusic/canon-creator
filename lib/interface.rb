@@ -67,9 +67,10 @@ define :canon_play do |canon_arg|
     raise "This canon is empty"
   else
     # Find how many voices to play- this is the same as beats in a bar.
+    num_voices = canon.get_metadata.get_number_of_voices
     num_beats = canon.get_metadata.get_beats_in_bar
     # Play the melody the correct number of times at the different offsets.
-    num_beats.times do
+    num_voices.times do
       in_thread do
         # Start this voice with a random pan value.
         play_melody(canon_internal_rep, rand * 0.75)
