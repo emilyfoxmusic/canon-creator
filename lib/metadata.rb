@@ -244,6 +244,24 @@ class Metadata
     return self
   end
 
+  ## SETTER
+  # ARGS: Number of bars in the piece.
+  # DESCRIPTION: Sets the number of bars in the piece.
+  # RETURNS: This Metadata object.
+  def number_of_bars(n)
+    @metadata[:number_of_bar] = n
+    return self
+  end
+
+  ## SETTER
+  # ARGS: Number of voices.
+  # DESCRIPTION: Sets the number of voices for this piece.
+  # RETURNS: This Metadata object.
+  def number_of_voices(n)
+    @metadata[:number_of_voices] = n
+    return self
+  end
+
   ## NB: There is an assumption that these will only be called by the canon class- so things are not generated ranomly until they are linked with a canon. These should NOT be used in setters!
 
   ## GETTER
@@ -391,5 +409,27 @@ class Metadata
       self.probabilities([0.25, 0.25, 0.25, 0.25])
     end
     return @metadata[:probabilities]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the number of bars in the piece. Default to 2 times the number of beats in a bar.
+  # RETURNS: Number of bars.
+  def get_number_of_bars()
+    if @metadata[:number_of_bars] == nil
+      @metadata[:number_of_bars] = 2 * get_beats_in_bar
+    end
+    return @metadata[:number_of_bars]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the number of voices in the piece. Default to the number of beats in a bar.
+  # RETURNS: Number of voices.
+  def get_number_of_voices()
+    if @metadata[:number_of_voices] == nil
+      @metadata[:number_of_voices] = get_beats_in_bar
+    end
+    return @metadata[:number_of_voices]
   end
 end
