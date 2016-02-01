@@ -90,12 +90,24 @@ class Canon
       chord_progression = Array.new(@metadata.get_beats_in_bar)
       # State which chords are available
       chord_choice = [:I, :IV, :V, :VI]
-      # Choose each chord at random except the last two which are always IV-I or V-I (plagal or perfect cadence)
-      for i in 0..chord_progression.length - 3
-        chord_progression[i] = chord_choice.choose
+      if @metadata.get_type == :round
+        # Choose each chord at random except the last two which are always V-I (perfect cadence)
+        for i in 0..chord_progression.length - 3
+          chord_progression[i] = chord_choice.choose
+        end
+        chord_progression[chord_progression.length - 2] = :V
+        chord_progression[chord_progression.length - 1] = :I
+      elsif @metadata.get_type == :crab
+        # The first two chords must be I-V for a perfect cadence when it is reversed.
+        chord_progression[0] = :I
+        chord_progression[1] = :V
+        # The rest are unconstrained.
+        for i in 2..chord_progression.length - 1
+          chord_progression[i] = chord_choice.choose
+        end
+      else
+        raise "Unknown canon type: #{ @metadata.get_type }."
       end
-      chord_progression[chord_progression.length - 2] = [:IV, :V].choose
-      chord_progression[chord_progression.length - 1] = :I
       # Set the member variable.
       @metadata.chord_progression(chord_progression)
     end
@@ -117,11 +129,21 @@ class Canon
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
       # Generate the canon structure and make the root notes fresh variables.
-      canon = Array.new(@metadata.get_number_of_bars)
-      for bar in 0..canon.length - 1
-        canon[bar] = Array.new(@metadata.get_beats_in_bar)
-        for beat in 0..canon[bar].length - 1
-          canon[bar][beat] = {root_note: fresh, rhythm: nil, notes: nil}
+      if @metadata.get_type == :round
+        canon = Array.new(@metadata.get_number_of_bars)
+        for bar in 0..canon.length - 1
+          canon[bar] = Array.new(@metadata.get_beats_in_bar)
+          for beat in 0..canon[bar].length - 1
+            canon[bar][beat] = {root_note: fresh, rhythm: nil, notes: nil}
+          end
+        end
+      elsif @metadata.get_type == :crab
+        canon = Array.new(@metadata.get_beats_in_bar * 2)
+        for bar in 0..canon.length - 1
+          canon[bar] = Array.new(@metadata.get_beats_in_bar)
+          for beat in 0..canon[bar].length - 1
+            canon[beat][bar] = {root_note: fresh, rhythm: nil, notes: nil}
+          end
         end
       end
       # Initialise constraints.
@@ -133,6 +155,11 @@ class Canon
       conde_options = []
       tonics_in_scale.map { |tonic| conde_options << eq(canon[@metadata.get_number_of_bars - 1][@metadata.get_beats_in_bar - 1][:root_note], tonic) }
       constraints << conde(*conde_options)
+      # If the canon is a crab then the first note must also be a tonic.
+      if @metadata.get_type == :crab
+        tonics_in_scale.map { |tonic| conde_options << eq(canon[0][0][:root_note], tonic) }
+        constraints << conde(*conde_options)
+      end
 
       # ARGS: Name of the chord (e.g. :I).
       # DESCRIPTION: Finds the notes in the given chord.
@@ -246,27 +273,51 @@ class Canon
       end
 
       # CONSTRAINT: All beats must be in the relevant chord, within max_jump in either direction from the next (but not the same), and not be the same as that in the same position in a later bar.
-      (@metadata.get_number_of_bars - 1).downto(0) do |bar|
-        (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-          # There is no constraint for the final beat- this was dealt with earlier.
-          if !(bar == @metadata.get_number_of_bars - 1 && beat == @metadata.get_beats_in_bar - 1)
-            # Find the note variables used in this place in other bars- we can't use the same one.
-            used_notes_in_this_position = []
-            # The next bar to the number of voices minus one is how many have to not clash.
-            for concurrent_bar in (bar + 1)..(bar + @metadata.get_number_of_voices - 1)
-              if concurrent_bar < @metadata.get_number_of_bars
-                used_notes_in_this_position << canon[concurrent_bar][beat][:root_note]
+      if @metadata.get_type == :round
+        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            # There is no constraint for the final beat- this was dealt with earlier.
+            if !(bar == @metadata.get_number_of_bars - 1 && beat == @metadata.get_beats_in_bar - 1)
+              # Find the note variables used in this place in other bars- we can't use the same one.
+              used_notes_in_this_position = []
+              # The next bar to the number of voices minus one is how many have to not clash.
+              for concurrent_bar in (bar + 1)..(bar + @metadata.get_number_of_voices - 1)
+                if concurrent_bar < @metadata.get_number_of_bars
+                  used_notes_in_this_position << canon[concurrent_bar][beat][:root_note]
+                end
+              end
+              # Add the actual constraints, split on where the next beat is.
+              if beat < @metadata.get_beats_in_bar - 1
+                # Next beat is in the same bar
+                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+                constraints << new_constraint
+              else
+                # Next beat is in the next bar
+                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+                constraints << new_constraint
               end
             end
-            # Add the actual constraints, split on where the next beat is.
-            if beat < @metadata.get_beats_in_bar - 1
-              # Next beat is in the same bar
-              new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
-              constraints << new_constraint
-            else
-              # Next beat is in the next bar
-              new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
-              constraints << new_constraint
+          end
+        end
+      else # This is a crab canon.
+        1.downto(0) do |bar|
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            # There is no constraint for the final beat - this was dealt with earlier.
+            if !(bar == (@metadata.get_beats_in_bar * 2) - 1 && beat == @metadata.get_beats_in_bar - 1)
+              # Find the note variables used in this place in the mirrored place. This is the only one that must not clash.
+              mirrored_bar = (bar == 0 ? 1 : 0)
+              mirrored_beat = @metadata.get_beats_in_bar - (beat + 1)
+              used_notes_in_this_position = [canon[mirrored_bar][mirrored_beat]]
+              # Add the actual constraints, split on where the next beat is.
+              if beat < @metadata.get_beats_in_bar - 1
+                # Next beat is in the same bar
+                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+                constraints << new_constraint
+              else
+                # Next beat is in the next bar
+                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+                constraints << new_constraint
+              end
             end
           end
         end

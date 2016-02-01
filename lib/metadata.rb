@@ -262,6 +262,19 @@ class Metadata
     return self
   end
 
+  ## SETTER
+  # ARGS: Type of canon- either :round or :crab
+  # DESCRIPTION: Sets the type of canon.
+  # RETURNS: This Metadata object.
+  def type(type)
+    if [:crab, :round].include?(type)
+      @metadata[:type] = type
+    else
+      raise "Invalid canon type: #{ type }."
+    end
+    return self
+  end
+
   ## NB: There is an assumption that these will only be called by the canon class- so things are not generated ranomly until they are linked with a canon. These should NOT be used in setters!
 
   ## GETTER
@@ -431,5 +444,16 @@ class Metadata
       @metadata[:number_of_voices] = get_beats_in_bar
     end
     return @metadata[:number_of_voices]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the type of the canon. Choose one at random if not specified.
+  # RETURNS: Canon type.
+  def get_type()
+    if @metadata[:type] == nil
+      @metadata[:type] = [:round, :crab].choose
+    end
+    return @metadata[:type]
   end
 end
