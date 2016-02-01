@@ -133,13 +133,18 @@ define :canon_play_crab do |canon_arg|
   if canon_internal_rep.length == 0 || canon_internal_rep[0].length == 0
     raise "This canon is empty"
   else
-    canon_reversed = canon.reverse
-    for i in 0..canon.length - 1
-      canon[i][:notes] = canon[i][:notes].reverse
-      canon[i][:rhythm] = canon[i][:rhythm].reverse
+    canon_reversed = canon_internal_rep.reverse
+    for bar in 0..canon_reversed.length - 1
+      canon_reversed[bar] = canon_reversed[bar].reverse
+      for beat in 0..canon_reversed[bar].length - 1
+        canon_reversed[bar][beat][:notes] = canon_reversed[bar][beat][:notes].reverse
+        canon_reversed[bar][beat][:rhythm] = canon_reversed[bar][beat][:rhythm].reverse
+      end
     end
-    play_melody(canon)
-    play_melody(canon_reversed)
+    in_thread do
+      play_melody(canon_internal_rep, rand * 0.75)
+    end
+    play_melody(canon_reversed, rand * 0.75)
   end
 end
 
