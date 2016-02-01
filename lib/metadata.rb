@@ -16,6 +16,7 @@
 # (S) number_of_bars
 # (S) number_of_voices
 # (S) type
+# (S) variations
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -28,6 +29,7 @@
 # (G) get_number_of_bars
 # (G) get_number_of_voices
 # (G) get_type
+# (G) get_variations
 
 class Metadata
 
@@ -305,6 +307,19 @@ class Metadata
     return self
   end
 
+  ## SETTER
+  # ARGS: Number of variations.
+  # DESCRIPTION: Sets the number of tune variations to generate.
+  # RETURNS: This Metadata object.
+  def variations(number)
+    if 0 < number && number <= 6
+      @metadata[:variations] = number
+    else
+      raise "Invalid number of variations. Must be between 1 and 6."
+    end
+    return self
+  end
+
   ## NB: There is an assumption that these will only be called by the canon class- so things are not generated ranomly until they are linked with a canon. These should NOT be used in setters!
 
   ## GETTER
@@ -493,5 +508,16 @@ class Metadata
       end
     end
     return @metadata[:type]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the Number of variations to generate. If none, choose a random number between 2 and 4.
+  # RETURNS: number of variations.
+  def get_variations()
+    if @metadata[:variations] == nil
+      @metadata[:variations] = [2, 3, 4].choose
+    end
+    return @metadata[:variations]
   end
 end
