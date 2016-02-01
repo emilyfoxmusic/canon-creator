@@ -13,6 +13,9 @@
 # (S) chord_progression
 # (S) max_jump
 # (S) probabilities
+# (S) number_of_bars
+# (S) number_of_voices
+# (S) type
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -22,6 +25,9 @@
 # (G) get_max_jump
 # (G) get_beats_in_bar
 # (G) get_probabilities
+# (G) get_number_of_bars
+# (G) get_number_of_voices
+# (G) get_type
 
 class Metadata
 
@@ -95,19 +101,19 @@ class Metadata
 
   ## SETTER
   # ARGS: The time signature.
-  # DESCRIPTION: Set the time signature. Only 3/4 and 4/4 are supported.
+  # DESCRIPTION: Set the time signature. Only 3/4 and 4/4 are supported. Check that the chord progression is a multiple of the beats per bar.
   # RETURNS: This Metadata object.
   def time_signature(time_sig)
     # Specify valid time signatures.
     valid_time_sigs = ["3/4", "4/4"]
     if valid_time_sigs.include?(time_sig)
       # The time signature is valid but it must also be consistent with the chord progression (if specified).
-      if @metadata[:chord_progression] == nil || (@metadata[:chord_progression].length == 3 && time_sig == "3/4") || (@metadata[:chord_progression].length == 4 && time_sig == "4/4")
+      if @metadata[:chord_progression] == nil || (@metadata[:chord_progression].length % 3 == 0 && time_sig == "3/4") || (@metadata[:chord_progression].length % 4 == 0 && time_sig == "4/4")
         # Consistent.
         @metadata[:time_sig] = time_sig
       else
         # Not consistent.
-        raise "Time signature incompatible with chord progression. Length must be equal to beats in a bar."
+        raise "Time signature incompatible with chord progression. Length must be equal to a multiple of beats in a bar."
       end
     else
       raise "The time signature #{ time_sig } is not supported."
@@ -157,7 +163,7 @@ class Metadata
 
   ## SETTER
   # ARGS: The chord progression.
-  # DESCRIPTION: Set the chord progression. This must have the same number of beats in as the number of beats per bar.
+  # DESCRIPTION: Set the chord progression. This must have a number of chords equal to a multiple of the beats per bar. We do NOT check that the total number of bars is a multiple of the number of bars in the progression. Check that a crab/palindrome's chord progression is symmetrical.
   # RETURNS: This Metadata object.
   def chord_progression(chord_progression)
 
@@ -177,35 +183,43 @@ class Metadata
       return is_valid
     end
 
-    # Check for consistency with the time signature.
-    case @metadata[:time_sig]
-    when nil
-      # No time signature means it must just be 3 or 4 beats long.
-      if chord_progression.length == 3 || chord_progression.length == 4
-        if check_chords(chord_progression)
+    # ARGS: The chord progression.
+    # DESCRIPTION: Check that the progression is symmetrical.
+    # RETURNS: A boolean of whether this is symmetrical or not.
+    def is_symmetrical(chord_progression)
+      return chord_progression == chord_progression.reverse
+    end
+
+    # Check for valid chords and symmetry if crab or palindrome.
+    if check_chords(chord_progression) && ([:round, nil].include?(@metadata[:type]) || is_symmetrical(chord_progression))
+      # Check for consistency with the time signature.
+      case @metadata[:time_sig]
+      when nil
+        # No time signature means it must a multiple of 3 or 4 beats long.
+        if chord_progression.length % 3 == 0 || chord_progression.length % 4 == 0
           @metadata[:chord_progression] = chord_progression
         else
-          raise "Invalid chord given. They must be one of: :I, :IV, :V or :VI."
+          raise "The chord progression must have a number of chords equal to a multiple of the number beats per bar."
         end
-      else
-        raise "The chord progression must have the same number of chords as beats per bar, i.e. 3 or 4."
-      end
-    when "3/4"
-      # The length must be 3.
-      if chord_progression.length == 3 && check_chords(chord_progression)
-        @metadata[:chord_progression] = chord_progression
-      else
-        raise "Invalid chord progression."
-      end
-    when "4/4"
-      # The length must be 4.
-      if chord_progression.length == 4 && check_chords(chord_progression)
-        @metadata[:chord_progression] = chord_progression
+      when "3/4"
+        # The length must be 3.
+        if chord_progression.length % 3 == 0
+          @metadata[:chord_progression] = chord_progression
+        else
+          raise "Invalid chord progression."
+        end
+      when "4/4"
+        # The length must be 4.
+        if chord_progression.length % 4 == 0
+          @metadata[:chord_progression] = chord_progression
+        else
+          raise "Invalid chord progression."
+        end
       else
         raise "Invalid chord progression."
       end
     else
-      raise "Invalid chord progression."
+      raise "Invalid chord progression. Use only :I, :IV, :V, :VI and a crab or palindrome progression must be symmetrical."
     end
     return self
   end
@@ -246,10 +260,26 @@ class Metadata
 
   ## SETTER
   # ARGS: Number of bars in the piece.
-  # DESCRIPTION: Sets the number of bars in the piece.
+  # DESCRIPTION: Sets the number of bars in the piece. It must be a multiple of the number of bars in the chord progression.
   # RETURNS: This Metadata object.
   def number_of_bars(n)
-    @metadata[:number_of_bar] = n
+    if @metadata[:chord_progression] == nil
+      # No chord progression to be consistent with.
+      @metadata[:number_of_bars] = n
+    else
+      # Find the number of beats in the chord progression.
+      number_of_beats_chord_prog = @metadata[:chord_progression].length
+      if @metadata[:time_sig] != nil
+        if number_of_beats_chord_prog % get_beats_in_bar == 0
+          @metadata[:number_of_bars] = n
+        else
+          raise "Number of bars not a multiple of the chord progression length given."
+        end
+      else
+        # No time signature to be consistent with.
+        @metadata[:number_of_bars] = n
+      end
+    end
     return self
   end
 
@@ -263,11 +293,11 @@ class Metadata
   end
 
   ## SETTER
-  # ARGS: Type of canon- either :round or :crab
+  # ARGS: Type of canon- either :round, :palindrome or :crab
   # DESCRIPTION: Sets the type of canon.
   # RETURNS: This Metadata object.
   def type(type)
-    if [:crab, :round].include?(type)
+    if [:crab, :round, :palindrome].include?(type)
       @metadata[:type] = type
     else
       raise "Invalid canon type: #{ type }."
@@ -321,17 +351,19 @@ class Metadata
   ## GETTER
   # ARGS: None.
   # DESCRIPTION: Get the time signature. Generate one randomly (whilst being consistent with the chord progression) if not specified.
-  # RETURNS: The tme signature (as a string).
+  # RETURNS: The time signature (as a string).
   def get_time_signature()
     # If there isn't a time signature chosen, then generate one.
     if @metadata[:time_sig] == nil
       # Ensure it's compatible with the chord progression.
       if get_chord_progression == nil
         self.time_signature(["3/4", "4/4"].choose)
-      elsif @metadata.get_chord_progression.length == 3
+      elsif @metadata.get_chord_progression.length % 3 == 0
         self.time_signature("3/4")
-      else
+      elsif @metadata.get_chord_progression.length % 4 == 0
         self.time_signature("4/4")
+      else
+        raise "Chord progression does not fit a time signature. Must be a multiple of 3 or 4 in length."
       end
     end
     return @metadata[:time_sig]
@@ -452,7 +484,13 @@ class Metadata
   # RETURNS: Canon type.
   def get_type()
     if @metadata[:type] == nil
-      @metadata[:type] = [:round, :crab].choose
+      if @metadata[:chord_progression] == @metadata[:chord_progression].reverse
+        # This chord progression is symmetrical so it can be a crab or palindrome.
+        @metadata[:type] = [:round, :crab, :palindrome].choose
+      else
+        # It must be a round if not symmetrical.
+        @metadata[:type] = :round
+      end
     end
     return @metadata[:type]
   end
