@@ -81,13 +81,17 @@ class Canon
     if @metadata.get_chord_progression != nil
       # Already exists.
       # The length of the chord progression must be the same as the number of beats in the bar.
-      if @metadata.get_chord_progression.length != @metadata.get_beats_in_bar
-        raise "Inconsistent metadata: chord progression."
+      if @metadata.get_chord_progression.length % @metadata.get_beats_in_bar != 0
+        raise "Chord progression must be a multiple of bars in length."
+      elsif [:crab, :palindrome].include?(@metadata.get_type) && !(@metadata.get_chord_progression == @metadata.get_chord_progression.reverse)
+        # If this is a crab canon or palindrome, the progression must be symmetrical.
+        raise "Chord progression must be symmetrical for a #{ @metadata.get_type } canon."
       end
     else
       # Does not already exist.
-      # Create a new array with a chord for each beat
-      chord_progression = Array.new(@metadata.get_beats_in_bar)
+      # Create a new array with a chord for each beat, one or two bars long.
+      number_of_bars_in_prog = [1,2].choose
+      chord_progression = Array.new(@metadata.get_beats_in_bar * number_of_bars_in_prog)
       # State which chords are available
       chord_choice = [:I, :IV, :V, :VI]
       if @metadata.get_type == :round
@@ -97,13 +101,17 @@ class Canon
         end
         chord_progression[chord_progression.length - 2] = :V
         chord_progression[chord_progression.length - 1] = :I
-      elsif @metadata.get_type == :crab
+      elsif @metadata.get_type == :crab || @metadata.get_type == :palindrome
         # The first two chords must be I-V for a perfect cadence when it is reversed.
         chord_progression[0] = :I
         chord_progression[1] = :V
-        # The rest are unconstrained.
-        for i in 2..chord_progression.length - 1
+        # The rest of the first half are unconstrained.
+        for i in 2..((chord_progression.length - 1) / 2)
           chord_progression[i] = chord_choice.choose
+        end
+        # The second half is a mirror of the first.
+        for i in (((chord_progression.length - 1) / 2) + 1)..(chord_progression.length - 1)
+          chord_progression[i] = chord_progression[chord_progression.length - (i + 1)]
         end
       else
         raise "Unknown canon type: #{ @metadata.get_type }."
@@ -276,6 +284,31 @@ class Canon
         end)
       end
 
+      def constrain_to_possible_notes_no_next_beat(current_beat_var, chord_name, unavailable_notes)
+        # Get all notes in the right chord.
+        possible_notes = notes_in_chord(chord_name)
+        # Return the project function, with the next beat and unavailable notes projected.
+        return project(unavailable_notes, lambda do |unavailable_notes|
+          refined_possibilities = possible_notes
+          # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
+          refined_possibilities = possible_notes.select do |note|
+            !unavailable_notes.include?(note)
+          end
+          # Return a conde clause of all these options unless there are none, in which case fail.
+          if refined_possibilities.empty?
+            # There are no options- return FAIL.
+            lambda { |x| nil }
+          else
+            # Constrain this note to these possibilities.
+            conde_options = []
+            refined_possibilities.map do |note|
+              conde_options << eq(current_beat_var, note)
+            end
+            conde(*conde_options)
+          end
+        end)
+      end
+
       # CONSTRAINT: All beats must be in the relevant chord, within max_jump in either direction from the next (but not the same), and not be the same as that in the same position in a different variation. For crabs and palindromes, the notes in the mirrored places must also not clash.
       for variation in 0..@metadata.get_variations - 1
         (bars_per_variation - 1).downto(0) do |bar|
@@ -298,6 +331,7 @@ class Canon
             end
 
             # TODO: actually add these constraints. Need to treat last one a bit differently.
+            # If this is the final beat, use the method with o
 
             # If this is not the final beat, there is a next beat
             if !(bar == @metadata.get_number_of_bars - 1 && beat == @metadata.get_beats_in_bar - 1)
