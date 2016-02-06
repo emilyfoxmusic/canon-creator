@@ -22,13 +22,13 @@ class Canon
     # Initialise member variables
     @metadata = metadata.clone() # Clone because the original version should not change when this one is modified for this specific canon.
     @concrete_scale = nil
-    @canon_skeleton = nil
+    @canon_skeletons = nil
     @canon_complete = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
     generate_canon_skeleton()
-    populate_canon()
+    #populate_canon()
     return self
   end
 
@@ -44,6 +44,11 @@ class Canon
   # RETURNS: The canon in its internal representation.
   def get_canon_as_array()
     return @canon_complete
+  end
+
+  ## TODO DELETE
+  def get_skel()
+    return @canon_skeletons
   end
 
   # ARGS: None.
@@ -137,19 +142,22 @@ class Canon
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
       # Generate the array of skeletons, the number specified by the number of variations. For palindromes and crab, multiply by 2.
+      canon_skeletons = nil
       if @metadata.get_type == :round
-        @canon_skeletons = Array.new(@metadata.get_variations)
+        canon_skeletons = Array.new(@metadata.get_variations)
       else
-        @canon_skeletons = Array.new(@metadata.get_variations * 2)
+        canon_skeletons = Array.new(@metadata.get_variations * 2)
       end
       # For each skeleton, create the structure depending on the chord progression.
       bars_per_variation = @metadata.get_chord_progression.length / @metadata.get_beats_in_bar
+      # For each variation, create an array of bars.
       for variation in 0..@metadata.get_variations - 1
-        @canon_skeletons[variation] = Array.new(bars_per_variation)
+        canon_skeletons[variation] = Array.new(bars_per_variation)
+        # For each bar, create an array of beats.
         for bar in 0..bars_per_variation - 1
-          @canon_skeletons[variation][bar] = Array.new(@metadata.get_beats_in_bar)
+          canon_skeletons[variation][bar] = Array.new(@metadata.get_beats_in_bar)
           for beat in 0..@metadata.get_beats_in_bar - 1
-            @canon_skeletons[variation][bar][beat] = {root_note: fresh, rhythm: nil, notes: nil}
+            canon_skeletons[variation][bar][beat] = {root_note: fresh, rhythm: nil, notes: nil}
           end
         end
       end
@@ -162,13 +170,16 @@ class Canon
       conde_options = []
       # For each variation, add that the final beat is a tonic.
       for variation in 0..@metadata.get_variations - 1
-        tonics_in_scale.map { |tonic| conde_options << eq(@canon_skeletons[variation][bars_per_variation - 1][@metadata.get_beats_in_bar - 1][:root_note], tonic) }
+        tonics_in_scale.map { |tonic| conde_options << eq(canon_skeletons[variation][bars_per_variation - 1][@metadata.get_beats_in_bar - 1][:root_note], tonic) }
       end
+      constraints << conde(*conde_options)
       # Crabs and palindromes also need the first note to be the tonic.
+      conde_options = []
       if @metadata.get_type == :crab || @metadata.get_type == :palindrome
         for variation in 0..@metadata.get_variations - 1
-          tonics_in_scale.map { |tonic| conde_options << eq(@canon_skeletons[variation][0][0][:root_note], tonic) }
+          tonics_in_scale.map { |tonic| conde_options << eq(canon_skeletons[variation][0][0][:root_note], tonic) }
         end
+        constraints << conde(*conde_options)
       end
 
       # ARGS: Name of the chord (e.g. :I).
@@ -252,7 +263,8 @@ class Canon
       # DESCRIPTION: This method adds constraints on the current beat to constrain it to:
       # 1) A note in the scale given
       # 2) A note not exceeding max_jump distance from the next
-      # 3) Not the same note as in successive bars in the same position.
+      # 3) Not the same note as in other variations in the same position.
+      # 4) For crabs and palindromes, not the same as the note in the mirrored position.
       # It fails if no such unification exists.
       # RETURNS: The project constraint which contains all this information.
       def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
@@ -316,7 +328,7 @@ class Canon
             # The used notes are any in previous variations in this position.
             used_notes_in_this_position = []
             for prev_variation in 0..variation - 1
-              used_notes_in_this_position << @canon_skeletons[prev_variation][bar][beat][:root_note]
+              used_notes_in_this_position << canon_skeletons[prev_variation][bar][beat][:root_note]
             end
             # If this is a crab or palindrome, and we are in the FIRST HALF of the piece, we cannot use the mirrored part.
             if @metadata.get_type == :crab || @metadata.get_type == :palindrome
@@ -325,93 +337,26 @@ class Canon
                 mirrored_beat = @metadata.get_beats_in_bar - (beat + 1)
                 # Add constraint for all mirror parts of variations already unified, including this one.
                 for prev_variation in 0..variation
-                  used_notes_in_this_position << @canon_skeletons[prev_variation][mirrored_bar][mirrored_beat][:root_note]
+                  used_notes_in_this_position << canon_skeletons[prev_variation][mirrored_bar][mirrored_beat][:root_note]
                 end
               end
             end
-
-            # TODO: actually add these constraints. Need to treat last one a bit differently.
-            # If this is the final beat, use the method with o
-
-            # If this is not the final beat, there is a next beat
-            if !(bar == @metadata.get_number_of_bars - 1 && beat == @metadata.get_beats_in_bar - 1)
-              # Find the note variables used in this place in other bars- we can't use the same one.
-              used_notes_in_this_position = []
-              # The next bar to the number of voices minus one is how many have to not clash.
-              for concurrent_bar in (bar + 1)..(bar + @metadata.get_number_of_voices - 1)
-                if concurrent_bar < @metadata.get_number_of_bars
-                  used_notes_in_this_position << canon[concurrent_bar][beat][:root_note]
-                end
-              end
-              # Add the actual constraints, split on where the next beat is.
+            # Find the chord for this beat.
+            number_of_bars_in_prog = @metadata.get_chord_progression.length / @metadata.get_beats_in_bar
+            chord_index = beat + @metadata.get_beats_in_bar * (bar % number_of_bars_in_prog)
+            chord_for_beat = @metadata.get_chord_progression[chord_index]
+            # If this is the final beat of a variation, use the method with only the current beat.
+            if (bar == number_of_bars_in_prog - 1 && beat == @metadata.get_beats_in_bar - 1)
+              new_constraint = constrain_to_possible_notes_no_next_beat(canon_skeletons[variation][bar][beat][:root_note], chord_for_beat, used_notes_in_this_position)
+              constraints << new_constraint
+            else # If not the last beat, constrain the current beat in relation to the next one.
               if beat < @metadata.get_beats_in_bar - 1
                 # Next beat is in the same bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
+                new_constraint = constrain_to_possible_notes(canon_skeletons[variation][bar][beat][:root_note], canon_skeletons[variation][bar][beat + 1][:root_note], chord_for_beat, used_notes_in_this_position)
                 constraints << new_constraint
               else
                 # Next beat is in the next bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
-                constraints << new_constraint
-              end
-            end
-          end
-        end
-      end
-      # CONSTRAINT:
-
-
-
-
-
-      # CONSTRAINT: All beats must be in the relevant chord, within max_jump in either direction from the next (but not the same), and not be the same as that in the same position in a later bar.
-      if @metadata.get_type == :round
-        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
-          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-            # There is no constraint for the final beat- this was dealt with earlier.
-            if !(bar == @metadata.get_number_of_bars - 1 && beat == @metadata.get_beats_in_bar - 1)
-              # Find the note variables used in this place in other bars- we can't use the same one.
-              used_notes_in_this_position = []
-              # The next bar to the number of voices minus one is how many have to not clash.
-              for concurrent_bar in (bar + 1)..(bar + @metadata.get_number_of_voices - 1)
-                if concurrent_bar < @metadata.get_number_of_bars
-                  used_notes_in_this_position << canon[concurrent_bar][beat][:root_note]
-                end
-              end
-              # Add the actual constraints, split on where the next beat is.
-              if beat < @metadata.get_beats_in_bar - 1
-                # Next beat is in the same bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
-                constraints << new_constraint
-              else
-                # Next beat is in the next bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], @metadata.get_chord_progression[beat], used_notes_in_this_position)
-                constraints << new_constraint
-              end
-            end
-          end
-        end
-      else # This is a crab canon.
-        extended_chord_progression = @metadata.get_chord_progression + @metadata.get_chord_progression.reverse
-        1.downto(0) do |bar|
-          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-            # There is no constraint for the final beat - this was dealt with earlier.
-            if !(bar == 1 && beat == @metadata.get_beats_in_bar - 1)
-              # Find the note variables used in this place in the mirrored place. This is the only one that must not clash.
-              # ONLY FIND THIS FOR NOTES IN THE FIRST BAR- THE CONSTRAINT IS SYMMETRIC.
-              used_notes_in_this_position = []
-              if bar == 0
-                mirrored_bar = 1
-                mirrored_beat = @metadata.get_beats_in_bar - (beat + 1)
-                used_notes_in_this_position = [canon[mirrored_bar][mirrored_beat][:root_note]]
-              end
-              # Add the actual constraints, split on where the next beat is.
-              if beat < @metadata.get_beats_in_bar - 1
-                # Next beat is in the same bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar][beat + 1][:root_note], extended_chord_progression[beat + (bar * @metadata.get_beats_in_bar)], used_notes_in_this_position)
-                constraints << new_constraint
-              else
-                # Next beat is in the next bar
-                new_constraint = constrain_to_possible_notes(canon[bar][beat][:root_note], canon[bar + 1][0][:root_note], extended_chord_progression[beat + (bar * @metadata.get_beats_in_bar)], used_notes_in_this_position)
+                new_constraint = constrain_to_possible_notes(canon_skeletons[variation][bar][beat][:root_note], canon_skeletons[variation][bar + 1][beat][:root_note], chord_for_beat, used_notes_in_this_position)
                 constraints << new_constraint
               end
             end
@@ -420,13 +365,13 @@ class Canon
       end
       # Run the query.
       q = fresh
-      run(1000, q, eq(q, canon), *constraints)
+      run(1000, q, eq(q, canon_skeletons), *constraints)
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
       raise "No canons available for these settings. Try increasing the range of the piece."
     else
-      @canon_skeleton = canon_structure_options.choose
+      @canon_skeletons = canon_structure_options.choose
     end
   end
 
