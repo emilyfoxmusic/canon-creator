@@ -22,13 +22,13 @@ class Canon
     # Initialise member variables
     @metadata = metadata.clone() # Clone because the original version should not change when this one is modified for this specific canon.
     @concrete_scale = nil
-    @canon_skeletons = nil
+    @variation_skeletons = nil
     @canon_complete = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
     generate_canon_skeleton()
-    #populate_canon()
+    #populate_canon() #TODO UNDO THISssssssssssss
     return self
   end
 
@@ -48,7 +48,7 @@ class Canon
 
   ## TODO DELETE
   def get_skel()
-    return @canon_skeletons
+    return @variation_skeletons
   end
 
   # ARGS: None.
@@ -371,7 +371,7 @@ class Canon
     if canon_structure_options.empty?
       raise "No canons available for these settings. Try increasing the range of the piece."
     else
-      @canon_skeletons = canon_structure_options.choose
+      @variation_skeletons = canon_structure_options.choose
     end
   end
 
@@ -382,7 +382,7 @@ class Canon
     # Pass the variables through to MiniKanren.
     metadata = @metadata
     concrete_scale = @concrete_scale
-    canon_skeleton = @canon_skeleton
+    variation_skeletons = @variation_skeletons
     # Begin the logic block.
     canon_completed_options = MiniKanren.exec do
       extend SonicPi::Lang::Core
@@ -390,7 +390,7 @@ class Canon
       # Get the variables that have been passed through.
       @metadata = metadata
       @concrete_scale = concrete_scale
-      @canon_skeleton = canon_skeleton
+      @variation_skeletons = variation_skeletons
 
       # ARGS: Two notes (midi numbers) ad the number of steps needed between them.
       # DESCRIPTION: Finds notes to walk from note 1 to note 2 in a certain number of steps.
@@ -533,35 +533,32 @@ class Canon
 
       # Initialise canon and constraints.
       constraints = []
-      canon = @canon_skeleton
+      variations_complete = @variation_skeletons
       # Make the notes and rhythms into fresh variables.
-      for i in 0..canon.length - 1
-        for j in 0..canon[i].length - 1
-          canon[i][j][:rhythm] = fresh
-          canon[i][j][:notes] = fresh
+      for variation in 0..variations_complete.length - 1
+        for bar in 0..variations_complete[variation].length - 1
+          for beat in 0..variations_complete[variation][bar].length - 1
+            variations_complete[variation][bar][beat][:rhythm] = fresh
+            variations_complete[variation][bar][beat][:notes] = fresh
+          end
         end
       end
       # Transform all the beats.
-      for i in 0..canon.length - 1
-        for j in 0..@metadata.get_beats_in_bar - 1
-          other_beat = nil
-          is_last_note = false
-          # is the next beat in this bar?
-          if j == canon[i].length - 1
-            # NO, is it in the next?
-            if i == canon.length - 1
-              # NO (there is no next beat- this is the final beat).
-              other_beat = canon[i][j - 1]
+      for variation in 0..@metadata.get_variations - 1
+        for bar in 0..@metadata.get_number_of_bars - 1
+          for beat in 0..@metadata.get_beats_in_bar - 1
+            other_beat = nil
+            is_last_note = false
+            if beat < @metadata.get_beats_in_bar - 1 # If the next beat is in this bar, constrain using next beat.
+              other_beat = variations_complete[variation][bar][beat + 1]
+            elsif bar < (@metadata.get_chord_progression.length / @metadata.get_beats_in_bar) - 1 # Else, if it's in the next, constrain using that beat.
+              other_beat = variations_complete[variation][bar + 1][0]
+            else # Else, if there is no next beat (last in variation) then transform with previous beat.
+              other_beat = variations_complete[variation][bar][beat - 1]
               is_last_note = true
-            else
-              # YES (the next beat is the first beat of the next bar).
-              other_beat = canon[i + 1][0]
             end
-          else
-            # YES (the next beat is in this bar).
-            other_beat = canon[i][j + 1]
+            transform_beat(constraints, variations_complete[variation][bar][beat], other_beat, is_last_note)
           end
-          transform_beat(constraints, canon[i][j], other_beat, is_last_note)
         end
       end
       # Run the query using q, a fresh query variable.
