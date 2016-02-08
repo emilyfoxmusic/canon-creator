@@ -24,9 +24,11 @@ class Canon
     @concrete_scale = nil
     @variation_skeletons = nil
     @canon_complete = nil
+    @variation_schedule = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
+    generate_variation_schedule()
     generate_canon_skeleton()
     populate_canon()
     return self
@@ -123,6 +125,37 @@ class Canon
       end
       # Set the member variable.
       @metadata.chord_progression(chord_progression)
+    end
+  end
+
+  def generate_variation_schedule()
+    # Find number of variations that need scheduling. (Total bars divided by length of variation.)
+    number_of_variations_to_schedule = @metadata.get_number_of_bars / (@metadata.get_chord_progression.length / @metadata.get_beats_in_bar)
+    # Initialise the array with the numbers of the variations.
+    @variation_schedule = Array.new(number_of_variations_to_schedule)
+    # Check what type of canon this is and schedule appropriately.
+    if @metadata.get_type == :round
+      # If this is a round, just randomly choose them, and play them all forwards.
+      for i in 0..number_of_variations_to_schedule - 1
+        @variation_schedule[i] = {variation: rrand_i(0, @metadata.get_variations - 1), direction: :forward}
+      end
+    elsif @metadata.get_type == :crab
+      # If this is a crab, schedule each variation forwards then backwards to ensure that there will be overlapping forwards and backwards melodies.
+      for i in 0..number_of_variations_to_schedule - 1
+        @variation_schedule[i] = {variation: i % @metadata.get_variations, direction: i % 2 == 0 ? :forward : :backward}
+      end
+    elsif @metadata.get_type == :palindrome
+      # If this is a palindrome, have the same constraint as the crab except also make it symmetric.
+      # Schedule the first half randomly.
+      for i in 0..(number_of_variations_to_schedule - 1) / 2
+        @variation_schedule[i] = {variation: rrand_i(0, @metadata.get_variations - 1), direction: [:forward, :backward].choose}
+      end
+      # Mirror the first half to get the second half.
+      for i in (number_of_variations_to_schedule / 2)..(number_of_variations_to_schedule - 1)
+        @variation_schedule[i] = @variation_schedule[number_of_variations_to_schedule - 1 - i]
+        # Change the direction of the mirrored part.
+        @variation_schedule[i][:direction] == :forward ? @variation_schedule[i][:direction] = :backward : @variation_schedule[i][:direction] = :forward
+      end
     end
   end
 
