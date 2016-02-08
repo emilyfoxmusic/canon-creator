@@ -23,14 +23,16 @@ class Canon
     @metadata = metadata.clone() # Clone because the original version should not change when this one is modified for this specific canon.
     @concrete_scale = nil
     @variation_skeletons = nil
-    @canon_complete = nil
+    @variations_complete = nil
     @variation_schedule = nil
+    @canon_complete = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
     generate_variation_schedule()
     generate_canon_skeleton()
     populate_canon()
+    generate_canon()
     return self
   end
 
@@ -128,6 +130,9 @@ class Canon
     end
   end
 
+  # ARGS: None.
+  # DESCRIPTION: Populates the variation schedule for the type of canon given.
+  # RETURNS: Nil.
   def generate_variation_schedule()
     # Find number of variations that need scheduling. (Total bars divided by length of variation.)
     number_of_variations_to_schedule = @metadata.get_number_of_bars / (@metadata.get_chord_progression.length / @metadata.get_beats_in_bar)
@@ -137,7 +142,7 @@ class Canon
     if @metadata.get_type == :round
       # If this is a round, just randomly choose them, and play them all forwards.
       for i in 0..number_of_variations_to_schedule - 1
-        @variation_schedule[i] = {variation: rrand_i(0, @metadata.get_variations - 1), direction: :forward}
+        @variation_schedule[i] = {variation: [*0..@metadata.get_variations - 1].choose, direction: :forward}
       end
     elsif @metadata.get_type == :crab
       # If this is a crab, schedule each variation forwards then backwards to ensure that there will be overlapping forwards and backwards melodies.
@@ -148,7 +153,7 @@ class Canon
       # If this is a palindrome, have the same constraint as the crab except also make it symmetric.
       # Schedule the first half randomly.
       for i in 0..(number_of_variations_to_schedule - 1) / 2
-        @variation_schedule[i] = {variation: rrand_i(0, @metadata.get_variations - 1), direction: [:forward, :backward].choose}
+        @variation_schedule[i] = {variation: [*0..@metadata.get_variations - 1].choose, direction: [:forward, :backward].choose}
       end
       # Mirror the first half to get the second half.
       for i in (number_of_variations_to_schedule / 2)..(number_of_variations_to_schedule - 1)
@@ -599,6 +604,41 @@ class Canon
       run(1000, q, eq(q, variations_complete), *constraints)
     end
     # Choose one of the canons.
-    @canon_complete = canon_completed_options.choose
+    @variations_complete = canon_completed_options.choose
+  end
+
+  # ARGS: None.
+  # DESCRIPTION: Uses the schedule of variations and the variations themselves to generate the complete canon melody.
+  # RETURNS: Nil.
+  def generate_canon()
+
+    # ARGS: A melody.
+    # DESCRIPTION: Reverses the melody.
+    # RETURNS: The reversed melody.
+    def reverse(melody)
+      melody = melody.reverse
+      for bar in 0..melody.length - 1
+        melody[bar] = melody[bar].reverse
+        for beat in 0..melody[bar].length - 1
+          melody[bar][beat][:notes] = melody[bar][beat][:notes].reverse
+          melody[bar][beat][:rhythm] = melody[bar][beat][:rhythm].reverse
+        end
+      end
+      return melody
+    end
+
+    # Initialise the completed canon to empty.
+    @canon_complete = []
+    # For each scheduled variation, add it to the final canon.
+    @variation_schedule.map do |schedule_entry|
+      # Get the next variation to be scheduled.
+      next_variation = @variations_complete[schedule_entry[:variation]]
+      # Reverse it if required.
+      if schedule_entry[:direction] == :backward
+        next_variation = reverse(next_variation)
+      end
+      # Update the complete canon by appending this variation.
+      @canon_complete = @canon_complete + next_variation
+    end
   end
 end
