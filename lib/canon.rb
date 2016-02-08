@@ -28,7 +28,7 @@ class Canon
     generate_concrete_scale()
     generate_chord_progression()
     generate_canon_skeleton()
-    #populate_canon() #TODO UNDO THISssssssssssss
+    populate_canon()
     return self
   end
 
@@ -544,8 +544,8 @@ class Canon
         end
       end
       # Transform all the beats.
-      for variation in 0..@metadata.get_variations - 1
-        for bar in 0..@metadata.get_number_of_bars - 1
+      for variation in 0..variations_complete.length - 1
+        for bar in 0..variations_complete[variation].length - 1
           for beat in 0..@metadata.get_beats_in_bar - 1
             other_beat = nil
             is_last_note = false
@@ -563,7 +563,7 @@ class Canon
       end
       # Run the query using q, a fresh query variable.
       q = fresh
-      run(1000, q, eq(q, canon), *constraints)
+      run(1000, q, eq(q, variations_complete), *constraints)
     end
     # Choose one of the canons.
     @canon_complete = canon_completed_options.choose
