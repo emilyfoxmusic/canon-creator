@@ -262,25 +262,26 @@ class Metadata
 
   ## SETTER
   # ARGS: Number of bars in the piece.
-  # DESCRIPTION: Sets the number of bars in the piece. It must be a multiple of the number of bars in the chord progression.
+  # DESCRIPTION: Sets the number of bars in the piece. It must be a multiple of the number of bars in the chord progression, and an even number if it's a palindrome.
   # RETURNS: This Metadata object.
   def number_of_bars(n)
     if @metadata[:chord_progression] == nil
-      # No chord progression to be consistent with.
-      @metadata[:number_of_bars] = n
+      # No chord progression to be consistent with BUT must contain a multiple of the number of beats in the bar, so set to 1.
+      bars_in_chord_prog = 1
     else
       # Find the number of beats in the chord progression.
       number_of_beats_chord_prog = @metadata[:chord_progression].length
-      if @metadata[:time_sig] != nil
-        if number_of_beats_chord_prog % get_beats_in_bar == 0
-          @metadata[:number_of_bars] = n
-        else
-          raise "Number of bars not a multiple of the chord progression length given."
-        end
-      else
-        # No time signature to be consistent with.
+      bars_in_chord_prog = number_of_beats_chord_prog / get_beats_in_bar
+    end
+    if @metadata[:time_sig] != nil
+      if n % bars_in_chord_prog == 0 && (@metadata[:type] != :palindrome || (n / bars_in_chord_prog) % 2 == 0)
         @metadata[:number_of_bars] = n
+      else
+        raise "Number of bars not a multiple of the chord progression length/ time_signature given."
       end
+    else
+      # No time signature to be consistent with.
+      @metadata[:number_of_bars] = n
     end
     return self
   end
@@ -473,11 +474,15 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the number of bars in the piece. Default to 2 times the number of beats in a bar.
+  # DESCRIPTION: Return the number of bars in the piece. Default to 2 times the length of the chord progression, else the number of beats in a bar.
   # RETURNS: Number of bars.
   def get_number_of_bars()
     if @metadata[:number_of_bars] == nil
-      @metadata[:number_of_bars] = 2 * get_beats_in_bar
+      if get_chord_progression == nil
+        @metadata[:number_of_bars] = 2 * get_beats_in_bar
+      else
+        @metadata[:number_of_bars] = 2 * get_chord_progression.length
+      end
     end
     return @metadata[:number_of_bars]
   end
