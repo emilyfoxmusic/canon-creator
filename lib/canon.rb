@@ -646,18 +646,16 @@ class Canon
     # DESCRIPTION: Reverses the melody.
     # RETURNS: The reversed melody.
     def reverse(melody)
-      # Reverse bar order.
-      melody = melody.reverse
+      melody_rev = Array.new(melody.length, Array.new(melody[0].length))
       for bar in 0..melody.length - 1
-        # Reverse beat order.
-        melody[bar] = melody[bar].reverse
         for beat in 0..melody[bar].length - 1
           # Reverse notes and rhythms.
-          melody[bar][beat][:notes] = melody[bar][beat][:notes].reverse
-          melody[bar][beat][:rhythm] = melody[bar][beat][:rhythm].reverse
+          melody_rev[bar][beat] = {root_note: melody[bar][beat][:root_note], notes: melody[bar][beat][:notes].reverse, rhythm: (melody[bar][beat][:rhythm]).reverse}
         end
+        melody_rev[bar] = melody_rev[bar].reverse
       end
-      return melody
+      melody_rev = melody_rev.reverse
+      return melody_rev
     end
 
     # Initialise the completed canon to empty.
@@ -668,8 +666,10 @@ class Canon
       next_variation = @variations[schedule_entry[:variation]]
       # Reverse it if required.
       if schedule_entry[:direction] == :backward
-        next_variation = reverse(next_variation)
+        tetetet = next_variation.clone()
+        next_variation = reverse(next_variation.clone)
       end
+
       # Update the complete canon by appending this variation.
       @canon_complete = @canon_complete + next_variation
     end
