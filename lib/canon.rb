@@ -24,15 +24,14 @@ class Canon
     @concrete_scale = nil
     @chord_progression = nil
     @variations = nil
-    @variation_schedule = nil
+    @canon_skeleton = nil
     @canon_complete = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
-    generate_variation_schedule()
-    generate_variation_skeletons()
-    populate_variations()
-    generate_canon()
+    generate_variations()
+    generate_skeleton()
+    #generate_canon() # TODO- populate the skeleton
     return self
   end
 
@@ -50,16 +49,16 @@ class Canon
     return @canon_complete
   end
 
-  def get_schedule #TODO delete!!
-    return @variation_schedule
-  end
-
   def get_chord_prog
     return @chord_progression
   end
 
   def get_variations
     return @variations
+  end
+
+  def get_skeleton
+    return @canon_skeleton
   end
 
   # ARGS: None.
@@ -92,7 +91,7 @@ class Canon
   # RETURNS: Nil.
   def generate_chord_progression()
     # Create a new array with a chord for each beat, with the number of beats dictated by the metadata.
-    @chord_progression = Array.new(@metadata.get_beats_in_bar * @metadata.get_bars_per_variation)
+    @chord_progression = Array.new(@metadata.get_beats_in_bar * @metadata.get_bars_per_chord_prog)
     # State which chords are available
     chord_choice = [:I, :IV, :V, :VI]
     if @metadata.get_type == :round
@@ -120,51 +119,20 @@ class Canon
   end
 
   # ARGS: None.
-  # DESCRIPTION: Populates the variation schedule for the type of canon given.
+  # DESCRIPTION: Generates variationswhich are arrays of uniform random variables to specify which transformation to do.
   # RETURNS: Nil.
-  def generate_variation_schedule()
-    # Find number of variations that need scheduling. (Total bars divided by length of variation, rounded up.)
-    number_of_variations_to_schedule = (@metadata.get_number_of_bars.to_f / @metadata.get_bars_per_variation).ceil
-    # If this this a palindrome, there must be an even number of variations to schedule.
-    if @metadata.get_type == :palindrome && (number_of_variations_to_schedule % 2 != 0)
-      number_of_variations_to_schedule = number_of_variations_to_schedule + 1
-    end
-    # Initialise the array with the numbers of the variations.
-    @variation_schedule = Array.new(number_of_variations_to_schedule)
-    # Check what type of canon this is and schedule appropriately.
-    if @metadata.get_type == :round
-      # If this is a round, just randomly choose variations, and play them all forwards.
-      for i in 0..number_of_variations_to_schedule - 1
-        @variation_schedule[i] = {variation: [*0..@metadata.get_variations - 1].choose, direction: :forward}
+  def generate_variations()
+    @variations = []
+    for variation in 0..@metadata.get_bars_per_chord_prog - 1
+      this_variation = []
+      for beat in 0..@metadata.get_beats_in_bar - 1
+        this_variation << rand()
       end
-    elsif @metadata.get_type == :crab
-      # If this is a crab, schedule each variation forwards then backwards to ensure that there will be overlapping forwards and backwards melodies.
-      for i in 0..number_of_variations_to_schedule - 1
-        @variation_schedule[i] = {variation: (i / 2) % @metadata.get_variations, direction: i % 2 == 0 ? :forward : :backward}
-      end
-    elsif @metadata.get_type == :palindrome
-      # If this is a palindrome, make it symmetric.
-      # Schedule the first half randomly.
-      for i in 0..(number_of_variations_to_schedule - 1) / 2
-        @variation_schedule[i] = {variation: [*0..@metadata.get_variations - 1].choose, direction: [:forward, :backward].choose}
-      end
-      # Mirror the first half to get the second half.
-      for i in (number_of_variations_to_schedule / 2)..(number_of_variations_to_schedule - 1)
-        # Change the direction of the mirrored part.
-        if @variation_schedule[number_of_variations_to_schedule - 1 - i][:direction] == :forward
-          direction = :backward
-        else
-          direction = :forward
-        end
-        @variation_schedule[i] = {variation: @variation_schedule[number_of_variations_to_schedule - 1 - i][:variation], direction: direction}
-      end
+      @variations << this_variation
     end
   end
 
-  # ARGS: None.
-  # DESCRIPTION: Populates the variations with skeletons using the key and scale to find good root notes for each beat.
-  # RETURNS: Nil.
-  def generate_variation_skeletons()
+  def generate_skeleton()
     # Pass the variables through to MiniKanren.
     metadata = @metadata
     concrete_scale = @concrete_scale
@@ -178,18 +146,79 @@ class Canon
       # Extend MiniKanren so that Sonic Pi's methods can be used.
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
-      # Generate the array of skeletons, the number specified by the number of variations.
-      variation_skeletons = Array.new(@metadata.get_variations)
-      # For each skeleton, create the structure depending on the chord progression.
-      # For each variation, create an array of bars.
-      for variation in 0..@metadata.get_variations - 1
-        variation_skeletons[variation] = Array.new(@metadata.get_bars_per_variation)
-        # For each bar, create an array of beats.
-        for bar in 0..@metadata.get_bars_per_variation - 1
-          variation_skeletons[variation][bar] = Array.new(@metadata.get_beats_in_bar)
-          for beat in 0..@metadata.get_beats_in_bar - 1
-            variation_skeletons[variation][bar][beat] = {root_note: fresh, rhythm: nil, notes: nil}
-          end
+      # Generate the canon skeleton structure, with the root notes as variables.
+      canon_skeleton = Array.new(@metadata.get_number_of_bars) # One cell per bar.
+      for bar in 0..@metadata.get_number_of_bars - 1
+        canon_skeleton[bar] = Array.new(@metadata.get_beats_in_bar) # One cell per beat.
+        for beat in 0..@metadata.get_beats_in_bar - 1
+          canon_skeleton[bar][beat] = {root_note: fresh, notes: nil, rhythm: nil} # The root note is a variable.
+        end
+      end
+
+      # ARGS: MiniKanren variables: the current beat's root note, the next beats's root note and the notes that have already been used in this position. The name of the chord assciated with this beat.
+      # DESCRIPTION: This method adds constraints on the current beat to constrain it to:
+      # 1) A note in the scale given (tonic option included)
+      # 2) A note not exceeding max_jump distance from the next
+      # 3) Not the same note as in other variations in the same position
+      # It fails if no such unification exists.
+      # RETURNS: The project constraint which contains all this information.
+      def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
+        possible_notes = nil
+        # Get all notes in the right chord, or tonics.
+        if chord_name == :tonic
+          # Get all tonic notes.
+          mod_tonic = SonicPi::Note.resolve_midi_note(@metadata.get_key_note) % 12
+          possible_notes = @concrete_scale.select { |note| (note % 12) == mod_tonic }
+        else
+          possible_notes = notes_in_chord(chord_name)
+        end
+        # If this is the last beat, then there is no next beat.
+        if next_beat_var == nil
+          # Return the project function, with the next beat and unavailable notes projected.
+          return project(unavailable_notes, lambda do |unavailable_notes|
+            refined_possibilities = possible_notes
+            # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
+            refined_possibilities = possible_notes.select do |note|
+              !unavailable_notes.include?(note)
+            end
+            # Return a conde clause of all these options unless there are none, in which case fail.
+            if refined_possibilities.empty?
+              # There are no options- return FAIL.
+              lambda { |x| nil }
+            else
+              # Constrain this note to these possibilities.
+              conde_options = []
+              refined_possibilities.map do |note|
+                conde_options << eq(current_beat_var, note)
+              end
+              conde(*conde_options)
+            end
+          end)
+        else
+          # Return the project function, with the next beat and unavailable notes projected.
+          return project(next_beat_var, lambda do |next_beat|
+            project(unavailable_notes, lambda do |unavailable_notes|
+              refined_possibilities = possible_notes
+              # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
+              refined_possibilities = possible_notes.select do |note|
+                b = (note - next_beat).abs <= @metadata.get_max_jump
+                b = b && (note - next_beat).abs != 0
+                b && !unavailable_notes.include?(note)
+              end
+              # Return a conde clause of all these options unless there are none, in which case fail.
+              if refined_possibilities.empty?
+                # There are no options- return FAIL.
+                lambda { |x| nil }
+              else
+                # Constrain this note to these possibilities.
+                conde_options = []
+                refined_possibilities.map do |note|
+                  conde_options << eq(current_beat_var, note)
+                end
+                conde(*conde_options)
+              end
+            end)
+          end)
         end
       end
 
@@ -270,174 +299,100 @@ class Canon
         end
       end
 
-      # ARGS: MiniKanren variables: the current beat's root note, the next beats's root note and the notes that have already been used in this position. The name of the chord assciated with this beat.
-      # DESCRIPTION: This method adds constraints on the current beat to constrain it to:
-      # 1) A note in the scale given
-      # 2) A note not exceeding max_jump distance from the next
-      # 3) Not the same note as in other variations in the same position.
-      # 4) For crabs and palindromes, not the same as the note in the mirrored position.
-      # It fails if no such unification exists.
-      # RETURNS: The project constraint which contains all this information.
-      def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
-        # Get all notes in the right chord.
-        possible_notes = notes_in_chord(chord_name)
-        # Return the project function, with the next beat and unavailable notes projected.
-        return project(next_beat_var, lambda do |next_beat|
-          project(unavailable_notes, lambda do |unavailable_notes|
-            refined_possibilities = possible_notes
-            # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
-            refined_possibilities = possible_notes.select do |note|
-              b = (note - next_beat).abs <= @metadata.get_max_jump
-              b = b && (note - next_beat).abs != 0
-              b && !unavailable_notes.include?(note)
-            end
-            # Return a conde clause of all these options unless there are none, in which case fail.
-            if refined_possibilities.empty?
-              # There are no options- return FAIL.
-              lambda { |x| nil }
-            else
-              # Constrain this note to these possibilities.
-              conde_options = []
-              refined_possibilities.map do |note|
-                conde_options << eq(current_beat_var, note)
-              end
-              conde(*conde_options)
-            end
-          end)
-        end)
-      end
-
-      def constrain_to_possible_notes_no_next_beat(current_beat_var, chord_name, unavailable_notes)
-        # Get all notes in the right chord.
-        possible_notes = notes_in_chord(chord_name)
-        # Return the project function, with the next beat and unavailable notes projected.
-        return project(unavailable_notes, lambda do |unavailable_notes|
-          refined_possibilities = possible_notes
-          # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
-          refined_possibilities = possible_notes.select do |note|
-            !unavailable_notes.include?(note)
+      def add_constraints(constraints, canon_skeleton, bar, beat)
+        used_notes_in_this_position = []
+        for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
+          # If this bar exists then add the corresponding beat to the one to watch.
+          if overlapping_bar < @metadata.get_number_of_bars
+            used_notes_in_this_position << canon_skeleton[overlapping_bar][beat]
           end
-          # Return a conde clause of all these options unless there are none, in which case fail.
-          if refined_possibilities.empty?
-            # There are no options- return FAIL.
-            lambda { |x| nil }
-          else
-            # Constrain this note to these possibilities.
-            conde_options = []
-            refined_possibilities.map do |note|
-              conde_options << eq(current_beat_var, note)
-            end
-            conde(*conde_options)
-          end
-        end)
-      end
-
-      def constrain_to_tonic_basic(current_beat_var)
-        # Get all tonic notes.
-        mod_tonic = SonicPi::Note.resolve_midi_note(@metadata.get_key_note) % 12
-        possible_notes = @concrete_scale.select { |note| (note % 12) == mod_tonic }
-        # Return a conde clause of all these options unless there are none, in which case fail.
-        if possible_notes.empty?
-          # There are no options- return FAIL.
-          lambda { |x| nil }
-        else
-          # Constrain this note to these possibilities.
-          conde_options = []
-          possible_notes.map do |note|
-            conde_options << eq(current_beat_var, note)
-          end
-          conde(*conde_options)
         end
-      end
 
-      def constrain_to_tonic(current_beat_var, next_beat_var)
-        # Get all tonic notes.
-        mod_tonic = SonicPi::Note.resolve_midi_note(@metadata.get_key_note) % 12
-        possible_notes = @concrete_scale.select { |note| (note % 12) == mod_tonic }
-        # Return the project function, with the unavailable notes projected.
-        return project(next_beat_var, lambda do |next_beat|
-          refined_possibilities = possible_notes
-          # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
-          refined_possibilities = possible_notes.select do |note|
-            b = (note - next_beat).abs <= @metadata.get_max_jump
-            b && (note - next_beat).abs != 0
-          end
-          # Return a conde clause of all these options unless there are none, in which case fail.
-          if refined_possibilities.empty?
-            # There are no options- return FAIL.
-            lambda { |x| nil }
-          else
-            # Constrain this note to these possibilities.
-            conde_options = []
-            refined_possibilities.map do |note|
-              conde_options << eq(current_beat_var, note)
-            end
-            conde(*conde_options)
-          end
-        end)
+        puts used_notes_in_this_position
+
+        # Constrain the notes.
+        # Find the chord for this beat.
+        chord_for_beat = @chord_progression[beat + @metadata.get_beats_in_bar * (bar % @metadata.get_bars_per_chord_prog)]
+
+        puts "bar: " + bar.to_s + "   beat: " + beat.to_s + "   chord: " + chord_for_beat.to_s
+
+        # Split depending on which beat this is.
+        if beat < @metadata.get_beats_in_bar - 1 # The next beat is in the same bar.
+          new_constraint = constrain_to_possible_notes(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar][beat + 1][:root_note], chord_for_beat, used_notes_in_this_position)
+          constraints << new_constraint
+          puts "smae b"
+        elsif bar != @metadata.get_number_of_bars - 1 # The next beat is in the next bar.
+          new_constraint = constrain_to_possible_notes(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar + 1][0][:root_note], chord_for_beat, used_notes_in_this_position)
+          constraints << new_constraint
+          puts "diff b"
+        end # If not matched then it's the final note which has already been dealt with.
       end
 
       # Initialise constraints.
       constraints = []
-      # CONSTRAINT: Final root note of each variation is the tonic.
-      # For each variation, add that the final beat is a tonic.
-      for variation in 0..@metadata.get_variations - 1
-        constraints << constrain_to_tonic_basic(variation_skeletons[variation][@metadata.get_bars_per_variation - 1][@metadata.get_beats_in_bar - 1][:root_note])
-      end
-
-      # CONSTRAINT: All beats must be in the relevant chord, within max_jump in either direction from the next (but not the same), and not be the same as that in the same position in a different variation. For crabs and palindromes, the notes in the mirrored places must also not clash.
-      for variation in 0..@metadata.get_variations - 1
-        (@metadata.get_bars_per_variation - 1).downto(0) do |bar|
+      # CONSTRAINT (ALL): Final root note is the tonic.
+      constraints << constrain_to_possible_notes(canon_skeleton[@metadata.get_number_of_bars - 1][@metadata.get_beats_in_bar - 1][:root_note], nil, :tonic, [])
+      # Deal with the types individually.
+      case @metadata.get_type
+      when :round
+        # Cycle through the bars, adding constraints that each note is in the chord and different to overlapping ones.
+        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
           (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-            # The used notes are any in previous variations in this position.
-            used_notes_in_this_position = []
-            for prev_variation in 0..variation - 1
-              used_notes_in_this_position << variation_skeletons[prev_variation][bar][beat][:root_note]
-            end
-            # If this is a crab or palindrome, and we are in the FIRST HALF of the piece, we cannot use the mirrored part.
-            if @metadata.get_type == :crab || @metadata.get_type == :palindrome
-              if bar < @metadata.get_bars_per_variation / 2.0 && ((bar == @metadata.get_bars_per_variation / 2) ? (beat < @metadata.get_beats_in_bar / 2) : true)
-                mirrored_bar = @metadata.get_bars_per_variation - (bar + 1)
-                mirrored_beat = @metadata.get_beats_in_bar - (beat + 1)
-                # Add constraint for all mirror parts of variations already unified, including this one.
-                for prev_variation in 0..variation
-                  used_notes_in_this_position << variation_skeletons[prev_variation][mirrored_bar][mirrored_beat][:root_note]
-                end
-              end
-            end
-            # Find the chord for this beat.
-            chord_index = beat + @metadata.get_beats_in_bar * (bar % @metadata.get_bars_per_variation)
-            chord_for_beat = @chord_progression[chord_index]
-            # If this is the final beat of a variation, use the method with only the current beat.
-            if (bar == @metadata.get_bars_per_variation - 1 && beat == @metadata.get_beats_in_bar - 1)
-              new_constraint = constrain_to_possible_notes_no_next_beat(variation_skeletons[variation][bar][beat][:root_note], chord_for_beat, used_notes_in_this_position)
-              constraints << new_constraint
-            elsif (bar == 0 && beat == 0) && (@metadata.get_type == :crab || @metadata.get_type == :palindrome) # If this is the first beat in a crab or palindrome, it must be a nearby.
-              new_constraint = constrain_to_tonic(variation_skeletons[variation][0][0][:root_note], variation_skeletons[variation][0][1][:root_note])
-              constraints << new_constraint
-            else # If not the last beat, constrain the current beat in relation to the next one.
-              if beat < @metadata.get_beats_in_bar - 1
-                # Next beat is in the same bar
-                new_constraint = constrain_to_possible_notes(variation_skeletons[variation][bar][beat][:root_note], variation_skeletons[variation][bar][beat + 1][:root_note], chord_for_beat, used_notes_in_this_position)
-                constraints << new_constraint
-              else
-                # Next beat is in the next bar
-                new_constraint = constrain_to_possible_notes(variation_skeletons[variation][bar][beat][:root_note], variation_skeletons[variation][bar + 1][beat][:root_note], chord_for_beat, used_notes_in_this_position)
-                constraints << new_constraint
-              end
-            end
+            add_constraints(constraints, canon_skeleton, bar, beat)
           end
         end
+      when :crab
+        # Cycle through bars, unifying them alternately with a new set of notes (in the chord and different to overlapping notes) and then the mirror of the successive bar.
+        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+
+          end
+        end
+        # TODO
+      when :palindrome
+        # Cycle through to half way through the melody unifying as a round, then mirror for the first half. Exclude central one if odd number of bars.
+        (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            add_constraints(constraints, canon_skeleton ,bar, beat)
+          end
+        end
+        # ASSERT: the last half is unified, excluding middle bar if there's an odd number of bars.
+        # If there's an odd number of bars, deal with the middle one.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
+            add_constraints(constraints, canon_skeleton,bar, beat)
+          end
+        end
+        # ASSERT: half the canon is unified.
+        # Mirror the canon for the first half.
+        # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << eq(canon_skeleton[bar][bar][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+          end
+        end
+        # The first half mirrors the second half.
+        for bar in 0..((@metadata.get_number_of_bars - 2) / 2)
+          for beat in 0..(@metadata.get_beats_in_bar - 1)
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+          end
+        end
+      else
+        throw "No such type: #{ @metadata.get_type }"
       end
       # Run the query.
       q = fresh
-      run(1000, q, eq(q, variation_skeletons), *constraints)
+      run(1000, q, eq(q, canon_skeleton), *constraints)
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
-      raise "No canons available for these settings. Try increasing the range of the piece."
+      #raise "No canons available for these settings. Try increasing the range of the piece."
     else
-      @variations = canon_structure_options.choose
+      @canon_skeleton = canon_structure_options.choose
     end
   end
 

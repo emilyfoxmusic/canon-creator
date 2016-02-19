@@ -236,9 +236,9 @@ class Metadata
   # ARGS: number of bars per variation.
   # DESCRIPTION: Sets the number of bars per variation. Must be between 1 and 10.
   # RETURNS: This Metadata object.
-  def bars_per_variation(number)
+  def bars_per_chord_prog(number)
     if 0 < number && number <= 10
-      @metadata[:bars_per_variation] = number
+      @metadata[:bars_per_chord_prog] = number
     else
       raise "Invalid number of bars per variation. Must be between 1 and 10."
     end
@@ -370,11 +370,11 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the probabilities of transforming each beat into each number of notes. Default to equal probabilities.
+  # DESCRIPTION: Return the probabilities of transforming each beat into each number of notes. Default to 0.35, 0.3, 0.3, 0.05.
   # RETURNS: Array of probabilities.
   def get_probabilities()
     if @metadata[:probabilities] == nil
-      self.probabilities([0.25, 0.25, 0.25, 0.25])
+      self.probabilities([0.35, 0.3, 0.3, 0.05])
     end
     return @metadata[:probabilities]
   end
@@ -425,12 +425,12 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the Number of bars per variation. If none given, choose a random number between 1 and 4.
+  # DESCRIPTION: Return the Number of bars per chord progression. If none given, choose a random number between 1 and 4.
   # RETURNS: number of variations.
-  def get_bars_per_variation()
-    if @metadata[:bars_per_variation] == nil
-      @metadata[:bars_per_variation] = [1, 2, 3, 4].choose
+  def get_bars_per_chord_prog()
+    if @metadata[:bars_per_chord_prog] == nil
+      @metadata[:bars_per_chord_prog] = [1, 2, 3, 4].choose
     end
-    return @metadata[:bars_per_variation]
+    return @metadata[:bars_per_chord_prog]
   end
 end
