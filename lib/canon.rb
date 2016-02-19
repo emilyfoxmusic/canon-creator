@@ -299,6 +299,9 @@ class Canon
         end
       end
 
+      # ARGS: The array of constraints, the skeleton so far, the bar number and the beat number.
+      # DESCRIPTION: Adds a constraint to the root note of that beat based on those that mustn't overlap and the next beat.
+      # RETURNS: Nil.
       def add_constraints(constraints, canon_skeleton, bar, beat)
         used_notes_in_this_position = []
         for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
@@ -307,24 +310,16 @@ class Canon
             used_notes_in_this_position << canon_skeleton[overlapping_bar][beat]
           end
         end
-
-        puts used_notes_in_this_position
-
         # Constrain the notes.
         # Find the chord for this beat.
         chord_for_beat = @chord_progression[beat + @metadata.get_beats_in_bar * (bar % @metadata.get_bars_per_chord_prog)]
-
-        puts "bar: " + bar.to_s + "   beat: " + beat.to_s + "   chord: " + chord_for_beat.to_s
-
         # Split depending on which beat this is.
         if beat < @metadata.get_beats_in_bar - 1 # The next beat is in the same bar.
           new_constraint = constrain_to_possible_notes(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar][beat + 1][:root_note], chord_for_beat, used_notes_in_this_position)
           constraints << new_constraint
-          puts "smae b"
         elsif bar != @metadata.get_number_of_bars - 1 # The next beat is in the next bar.
           new_constraint = constrain_to_possible_notes(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar + 1][0][:root_note], chord_for_beat, used_notes_in_this_position)
           constraints << new_constraint
-          puts "diff b"
         end # If not matched then it's the final note which has already been dealt with.
       end
 
@@ -342,13 +337,32 @@ class Canon
           end
         end
       when :crab
-        # Cycle through bars, unifying them alternately with a new set of notes (in the chord and different to overlapping notes) and then the mirror of the successive bar.
-        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
-          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-
+        # Cycle through copies of the chord progression, unifying them alternately with a new set of notes (in the chord and different to overlapping notes) and then the mirror of the successive chord progression's root notes.
+        # Is this version of the chord progression a mirror of the next?
+        mirror = false # MUST start with false.
+        # For the number of cycles of the chord progression that happen in this piece.
+        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
+          # For the offset of bars within this (up to length of chord progression).
+          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
+            # Find the actual bar number.
+            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
+            if mirror
+              # Mirror the next version of the chord progression.
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
+                mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
+                constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+              end
+            else
+              # Just generate some more music.
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                add_constraints(constraints, canon_skeleton, bar, beat)
+              end
+            end
           end
+          # Flip whether we're mirroring or not.
+          mirror = !mirror
         end
-        # TODO
       when :palindrome
         # Cycle through to half way through the melody unifying as a round, then mirror for the first half. Exclude central one if odd number of bars.
         (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
