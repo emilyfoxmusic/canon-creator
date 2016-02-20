@@ -68,7 +68,7 @@ define :canon_play do |canon_arg|
   else
     # Find how many voices to play- this is the same as beats in a bar.
     num_voices = canon.get_metadata.get_number_of_voices
-    offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_bars_per_variation
+    offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_bars_per_chord_prog
     # Play the melody the correct number of times at the different offsets.
     num_voices.times do
       in_thread do

@@ -400,7 +400,7 @@ class Canon
       end
       # Run the query.
       q = fresh
-      run(1000, q, eq(q, canon_skeleton), *constraints)
+      run(40, q, eq(q, canon_skeleton), *constraints)
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
@@ -679,7 +679,7 @@ class Canon
       end
       # Run the query using q, a fresh query variable.
       q = fresh
-      run(1000, q, eq(q, canon), *constraints)
+      run(40, q, eq(q, canon), *constraints)
     end
     # Choose one of the canons.
     @canon_complete = populated_canons.choose
