@@ -191,7 +191,7 @@ class Canon
               refined_possibilities.map do |note|
                 conde_options << eq(current_beat_var, note)
               end
-              conde(*conde_options)
+              conde(*conde_options.shuffle)
             end
           end)
         else
@@ -215,7 +215,7 @@ class Canon
                 refined_possibilities.map do |note|
                   conde_options << eq(current_beat_var, note)
                 end
-                conde(*conde_options)
+                conde(*conde_options.shuffle)
               end
             end)
           end)
@@ -683,43 +683,5 @@ class Canon
     end
     # Choose one of the canons.
     @canon_complete = populated_canons.choose
-  end
-
-  # ARGS: None.
-  # DESCRIPTION: Uses the schedule of variations and the variations themselves to generate the complete canon melody.
-  # RETURNS: Nil.
-  def generate_canon()
-
-    # ARGS: A melody.
-    # DESCRIPTION: Reverses the melody.
-    # RETURNS: The reversed melody.
-    def reverse(melody)
-      melody_rev = Array.new(melody.length, Array.new(melody[0].length))
-      for bar in 0..melody.length - 1
-        for beat in 0..melody[bar].length - 1
-          # Reverse notes and rhythms.
-          melody_rev[bar][beat] = {root_note: melody[bar][beat][:root_note], notes: melody[bar][beat][:notes].reverse, rhythm: (melody[bar][beat][:rhythm]).reverse}
-        end
-        melody_rev[bar] = melody_rev[bar].reverse
-      end
-      melody_rev = melody_rev.reverse
-      return melody_rev
-    end
-
-    # Initialise the completed canon to empty.
-    @canon_complete = []
-    # For each scheduled variation, add it to the final canon.
-    @variation_schedule.map do |schedule_entry|
-      # Get the next variation to be scheduled.
-      next_variation = @variations[schedule_entry[:variation]]
-      # Reverse it if required.
-      if schedule_entry[:direction] == :backward
-        tetetet = next_variation.clone()
-        next_variation = reverse(next_variation.clone)
-      end
-
-      # Update the complete canon by appending this variation.
-      @canon_complete = @canon_complete + next_variation
-    end
   end
 end
