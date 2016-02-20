@@ -31,7 +31,7 @@ class Canon
     generate_chord_progression()
     generate_variations()
     generate_skeleton()
-    #generate_canon() # TODO- populate the skeleton
+    populate_canon()
     return self
   end
 
@@ -123,7 +123,7 @@ class Canon
   # RETURNS: Nil.
   def generate_variations()
     @variations = []
-    for variation in 0..@metadata.get_bars_per_chord_prog - 1
+    for variation in 0..@metadata.get_variations - 1
       this_variation = []
       for beat in 0..@metadata.get_beats_in_bar - 1
         this_variation << rand()
@@ -413,21 +413,30 @@ class Canon
   # ARGS: None.
   # DESCRIPTION: Fleshes out the canon by transforming the beats into multiple notes. (Between 1 and 4).
   # RETURNS: Nil.
-  def populate_variations()
+  def populate_canon()
     # Pass the variables through to MiniKanren.
     metadata = @metadata
     concrete_scale = @concrete_scale
-    variation_skeletons = @variations
+    canon_skeleton = @canon_skeleton
     chord_progression = @chord_progression
+    variations = @variations
     # Begin the logic block.
-    populated_variations = MiniKanren.exec do
+    populated_canons = MiniKanren.exec do
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
       # Get the variables that have been passed through.
       @metadata = metadata
       @concrete_scale = concrete_scale
-      @variations = variation_skeletons
+      canon = canon_skeleton
+      @variations = variations
       @chord_progression = chord_progression
+      @variation_counter = 0
+
+      def get_next_variation
+        this_variation = @variations[@variation_counter]
+        @variation_counter = (@variation_counter + 1) % @metadata.get_variations
+        return this_variation
+      end
 
       # ARGS: Two notes (midi numbers) ad the number of steps needed between them.
       # DESCRIPTION: Finds notes to walk from note 1 to note 2 in a certain number of steps.
@@ -461,11 +470,10 @@ class Canon
       # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
       # DESCRIPTION: Unifies this beat's rhythm and pitches with a more interesting pattern. Randomly pick which transform to do for each beat based on the probabilities.
       # RETURNS: Nil.
-      def transform_beat(constraints, current_beat, other_beat, is_last_note)
+      def transform_beat(constraints, current_beat, other_beat, is_last_note, fate)
         # Get the probabilities.
         probabilities = @metadata.get_probabilities
-        # Randomly choose a value between 0 and 1 to decide which transform to use.
-        fate = rand()
+        # Choose which transform to use.
         if fate < probabilities[0]
           # Single transform.
           transform_beat_single(constraints, current_beat)
@@ -503,10 +511,8 @@ class Canon
         if is_last_note
           # This is the final note of the piece. Unify the second note with the root and the first with a walking note.
           constraints << eq(n2, current_beat[:root_note])
-          # Project the previous beat so that we can find a walking note from it.
-          constraints << project(other_beat, lambda do |prev|
-            return eq([n1], find_walking_notes(prev[:notes].last, current_beat[:root_note], 1))
-          end)
+          # Find a walking note from the previous beat.
+          constraints << eq([n1], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 1))
         else
           # The first note is the root and the second walks to the next root note.
           constraints << eq(n1, current_beat[:root_note])
@@ -532,10 +538,8 @@ class Canon
         if is_last_note
           # This is the final note of the piece. Unify the third note with the root and the first two with walking notes.
           constraints << eq(n3, current_beat[:root_note])
-          # Project the previous beat so that we can find a walking note from it.
-          constraints << project(other_beat, lambda do |prev|
-            return eq([n1, n2], find_walking_notes(prev[:notes].last, current_beat[:root_note], 2))
-          end)
+          # Find a walking note from the previous beat.
+          constraints << eq([n1, n2], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 2))
         else
           # The first note is the root and the second two walk to the next root note.
           constraints << eq(n1, current_beat[:root_note])
@@ -557,10 +561,8 @@ class Canon
         if is_last_note
           # This is the final note of the piece. Unify the fourth note with the root and the first three with walking notes.
           constraints << eq(n4, current_beat[:root_note])
-          # Project the previous beat so that we can find a walking note from it.
-          constraints << project(other_beat, lambda do |prev|
-            return eq([n1, n2, n3], find_walking_notes(prev[:notes].last, current_beat[:root_note], 3))
-          end)
+          # Find a walking note from the previous beat.
+          constraints << eq([n1, n2, n3], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 3))
         else
           # The first note is the root and the second two walk to the next root note.
           constraints << eq(n1, current_beat[:root_note])
@@ -568,42 +570,119 @@ class Canon
         end
       end
 
+      def transform_beat_intelligent(constraints, canon, variation, bar, beat)
+        other_beat = nil
+        is_last_note = false
+        if beat < @metadata.get_beats_in_bar - 1 # If the next beat is in this bar, constrain using next beat.
+          other_beat = canon[bar][beat + 1]
+        elsif bar < (@chord_progression.length / @metadata.get_beats_in_bar) - 1 # Else, if it's in the next, constrain using that beat.
+          other_beat = canon[bar + 1][0]
+        else # Else, if there is no next beat (last in variation) then transform with previous beat.
+          other_beat = canon[bar][beat - 1]
+          is_last_note = true
+        end
+        transform_beat(constraints, canon[bar][beat], other_beat, is_last_note, variation[beat])
+      end
+
+      def are_mirrored(mirror_beat, ground_beat)
+        return project(ground_beat, lambda do |ground_beat|
+          all(
+          eq(mirror_beat[:rhythm], ground_beat[:rhythm].reverse),
+          eq(mirror_beat[:notes], ground_beat[:notes].reverse)
+          )
+        end)
+      end
+
       # Initialise canon and constraints.
       constraints = []
-      variations_complete = @variations
       # Make the notes and rhythms into fresh variables.
-      for variation in 0..variations_complete.length - 1
-        for bar in 0..variations_complete[variation].length - 1
-          for beat in 0..variations_complete[variation][bar].length - 1
-            variations_complete[variation][bar][beat][:rhythm] = fresh
-            variations_complete[variation][bar][beat][:notes] = fresh
-          end
+      for bar in 0..canon.length - 1
+        for beat in 0..canon[bar].length - 1
+          canon[bar][beat][:rhythm] = fresh
+          canon[bar][beat][:notes] = fresh
         end
       end
-      # Transform all the beats.
-      for variation in 0..variations_complete.length - 1
-        for bar in 0..variations_complete[variation].length - 1
+      # Treat each type differently.
+      case @metadata.get_type
+      when :round
+        # Cycle through the bars, tranforming them.
+        for bar in 0..@metadata.get_number_of_bars - 1
+          variation = get_next_variation
           for beat in 0..@metadata.get_beats_in_bar - 1
-            other_beat = nil
-            is_last_note = false
-            if beat < @metadata.get_beats_in_bar - 1 # If the next beat is in this bar, constrain using next beat.
-              other_beat = variations_complete[variation][bar][beat + 1]
-            elsif bar < (@chord_progression.length / @metadata.get_beats_in_bar) - 1 # Else, if it's in the next, constrain using that beat.
-              other_beat = variations_complete[variation][bar + 1][0]
-            else # Else, if there is no next beat (last in variation) then transform with previous beat.
-              other_beat = variations_complete[variation][bar][beat - 1]
-              is_last_note = true
-            end
-            transform_beat(constraints, variations_complete[variation][bar][beat], other_beat, is_last_note)
+            transform_beat_intelligent(constraints, canon, variation, bar, beat)
           end
         end
+      when :crab
+        # Cycle through copies of the chord progression, alternately mirroring and transforming.
+        # Is this version of the chord progression a mirror of the next?
+        mirror = false # MUST start with false.
+        # For the number of cycles of the chord progression that happen in this piece.
+        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
+          # For the offset of bars within this (up to length of chord progression).
+          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
+            # Find the actual bar number.
+            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
+            if mirror
+              # Mirror the notes.
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
+                mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
+                constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+              end
+            else
+              # Just do the transform.
+              variation = get_next_variation
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                transform_beat_intelligent(constraints, canon, variation, bar, beat)
+              end
+            end
+          end
+          # Flip whether we're mirroring or not.
+          mirror = !mirror
+        end
+      when :palindrome
+        # Cycle through to half way through the melody doing the transforms. Exclude central one if odd number of bars.
+        (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
+          variation = get_next_variation
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            transform_beat_intelligent(constraints, canon, variation, bar, beat)
+          end
+        end
+        # ASSERT: the last half is transformed, excluding middle bar if there's an odd number of bars.
+        # If there's an odd number of bars, deal with the middle one.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          variation = get_next_variation
+          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
+            transform_beat_intelligent(constraints, canon, variation, bar, beat)
+          end
+        end
+        # ASSERT: half the canon is unified.
+        # Mirror the canon for the first half.
+        # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+          end
+        end
+        # The first half mirrors the second half.
+        for bar in 0..((@metadata.get_number_of_bars - 2) / 2)
+          for beat in 0..(@metadata.get_beats_in_bar - 1)
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+          end
+        end
+      else
+        throw "No such type: #{ @metadata.get_type }"
       end
       # Run the query using q, a fresh query variable.
       q = fresh
-      run(1000, q, eq(q, variations_complete), *constraints)
+      run(1000, q, eq(q, canon), *constraints)
     end
     # Choose one of the canons.
-    @variations = populated_variations.choose
+    @canon_complete = populated_canons.choose
   end
 
   # ARGS: None.
