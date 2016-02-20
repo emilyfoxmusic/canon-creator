@@ -307,7 +307,7 @@ class Canon
         for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
           # If this bar exists then add the corresponding beat to the one to watch.
           if overlapping_bar < @metadata.get_number_of_bars
-            used_notes_in_this_position << canon_skeleton[overlapping_bar][beat]
+            used_notes_in_this_position << canon_skeleton[overlapping_bar][beat][:root_note]
           end
         end
         # Constrain the notes.
@@ -404,7 +404,7 @@ class Canon
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
-      #raise "No canons available for these settings. Try increasing the range of the piece."
+      raise "No canons available for these settings. Try increasing the range of the piece."
     else
       @canon_skeleton = canon_structure_options.choose
     end
@@ -508,16 +508,9 @@ class Canon
         n1, n2 = fresh(2)
         # Unify this beat's pitch with the two notes.
         constraints << eq(current_beat[:notes], [n1, n2])
-        if is_last_note
-          # This is the final note of the piece. Unify the second note with the root and the first with a walking note.
-          constraints << eq(n2, current_beat[:root_note])
-          # Find a walking note from the previous beat.
-          constraints << eq([n1], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 1))
-        else
-          # The first note is the root and the second walks to the next root note.
-          constraints << eq(n1, current_beat[:root_note])
-          constraints << eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1))
-        end
+        # Both are the root.
+        constraints << eq(n1, current_beat[:root_note])
+        constraints << eq(n2, current_beat[:root_note])
       end
 
       # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
@@ -525,26 +518,21 @@ class Canon
       # RETURNS: Nil.
       def transform_beat_triple(constraints, current_beat, other_beat, is_last_note)
         # Constrain the rhythm.
-        constraints << conde(
-        eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
-        eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
-        eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
-        )
+        conde_options = [
+          eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
+          eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)])
+          #eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+        ]
+        constraints << conde(*conde_options.shuffle)
         # Constrain the pitch.
         # Create new variables for each note.
         n1, n2, n3 = fresh(3)
         # Unify this beat's pitch with the three notes.
         constraints << eq(current_beat[:notes], [n1, n2, n3])
-        if is_last_note
-          # This is the final note of the piece. Unify the third note with the root and the first two with walking notes.
-          constraints << eq(n3, current_beat[:root_note])
-          # Find a walking note from the previous beat.
-          constraints << eq([n1, n2], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 2))
-        else
-          # The first note is the root and the second two walk to the next root note.
-          constraints << eq(n1, current_beat[:root_note])
-          constraints << eq([n2, n3], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
-        end
+        # The first note is the root and the second two walk to the next root note.
+        constraints << eq(n1, current_beat[:root_note])
+        constraints << eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1))
+        constraints << eq(n3, current_beat[:root_note])
       end
 
       # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
@@ -558,16 +546,10 @@ class Canon
         n1, n2, n3, n4 = fresh(4)
         # Unify this beat's pitch with the four notes.
         constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
-        if is_last_note
-          # This is the final note of the piece. Unify the fourth note with the root and the first three with walking notes.
-          constraints << eq(n4, current_beat[:root_note])
-          # Find a walking note from the previous beat.
-          constraints << eq([n1, n2, n3], find_walking_notes(other_beat[:root_note], current_beat[:root_note], 3))
-        else
-          # The first note is the root and the second two walk to the next root note.
-          constraints << eq(n1, current_beat[:root_note])
-          constraints << eq([n2, n3, n4], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 3))
-        end
+        # The first note is the root and the second two walk to the next root note.
+        constraints << eq(n1, current_beat[:root_note])
+        constraints << eq([n2, n3], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
+        constraints << eq(n4, current_beat[:root_note])
       end
 
       def transform_beat_intelligent(constraints, canon, variation, bar, beat)
