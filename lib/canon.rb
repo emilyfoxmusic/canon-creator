@@ -520,8 +520,8 @@ class Canon
         # Constrain the rhythm.
         conde_options = [
           eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
-          eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)])
-          #eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+          eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
+          eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
         ]
         constraints << conde(*conde_options.shuffle)
         # Constrain the pitch.
