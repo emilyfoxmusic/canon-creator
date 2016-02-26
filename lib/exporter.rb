@@ -23,6 +23,7 @@ class Exporter
     @time_sig = canon.get_metadata.get_time_signature
     @key_sig_note = canon.get_metadata.get_key_note
     @key_sig_type = canon.get_metadata.get_key_type
+    @num_voices = canon.get_metadata.get_number_of_voices
     @clef = "treble"
     @file_loc = file_loc
     @notes = []
@@ -438,14 +439,29 @@ class Exporter
     # DESCRIPTION: Find the Lilypond string that represents this canon.
     # RETURNS: The Lilypond string.
     def convert_to_lilypond()
-      # Add the staff information- clef, time signature, key signature etc..
-      lp = "\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ convert_key_note_to_lilypond(@key_sig_note) } \\#{ @key_sig_type.to_s }\n"
-      # Add the notes.
-      @notes.map do |note|
-        lp << "#{ note } "
+      # We need a staff for each voice.
+      whole = ""
+      for staff in 0..@num_voices - 1
+        # Add the staff information- clef, time signature, key signature etc..
+        lp = "\\new Staff {\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ convert_key_note_to_lilypond(@key_sig_note) } \\#{ @key_sig_type.to_s }\n"
+        # Add start rests, staff number * bars per chord progression.
+        one_bar_rest = (@time_sig == "3/4") ? "R2." : "R1"
+        for bar in 1..(@canon.get_metadata.get_bars_per_chord_prog * staff)
+          lp = lp + one_bar_rest + " "
+        end
+        # Add the notes.
+        @notes.map do |note|
+          lp << "#{ note } "
+        end
+        # Add rests to the end.
+        for bar in 1..((@num_voices - 1 - staff) * @canon.get_metadata.get_bars_per_chord_prog)
+          lp = lp + one_bar_rest + " "
+        end
+        whole = whole + lp + "}\n"
       end
+
       # Return the whole string, wrapped in curly braces.
-      return "{\n" + lp + "\n}"
+      return "{\n<<\n" + whole + "\n>>\n}"
     end
 
     # Interpret the canon to populate 'notes'.
