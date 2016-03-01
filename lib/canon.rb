@@ -438,7 +438,7 @@ class Canon
         return this_variation
       end
 
-      # ARGS: Two notes (midi numbers) ad the number of steps needed between them.
+      # ARGS: Two notes (midi numbers) and the number of steps needed between them.
       # DESCRIPTION: Finds notes to walk from note 1 to note 2 in a certain number of steps.
       # RETURNS: An array of notes (midi numbers) with this walk.
       def find_walking_notes(note1, note2, number_of_steps = 1)
@@ -460,8 +460,32 @@ class Canon
         difference_in_index = note1_index - note2_index
         # Find the notes in between, making sure that the lower note is the first index.
         if note1_index < note2_index
+          # Extend the note1 range by 2 if possible.
+          for i in 1..2
+            if note1_index - 1 > -1
+              note1_index = note1_index - 1
+            end
+          end
+          # Extend the note2 range by 2 if possible.
+          for i in 1..2
+            if note2_index + 1 < @concrete_scale.length
+              note2_index = note2_index + 1
+            end
+          end
           note_walk = choose_n(@concrete_scale[note1_index..note2_index], number_of_steps).sort
         else
+          # Extend the note1 range by 2 if possible.
+          for i in 1..2
+            if note2_index - 1 > -1
+              note2_index = note2_index - 1
+            end
+          end
+          # Extend the note2 range by 2 if possible.
+          for i in 1..2
+            if note1_index + 1 < @concrete_scale.length
+              note1_index = note1_index + 1
+            end
+          end
           note_walk = choose_n(@concrete_scale[note2_index..note1_index], number_of_steps).sort.reverse
         end
         return note_walk

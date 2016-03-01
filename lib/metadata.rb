@@ -224,10 +224,10 @@ class Metadata
   # DESCRIPTION: Sets the number of tune variations to generate.
   # RETURNS: This Metadata object.
   def variations(number)
-    if 0 < number && number <= 6
+    if 0 < number && number <= 100
       @metadata[:variations] = number
     else
-      raise "Invalid number of variations. Must be between 1 and 6."
+      raise "Invalid number of variations. Must be between 1 and 100."
     end
     return self
   end
@@ -414,11 +414,11 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the Number of variations to generate. If none, choose a random number between 2 and 4.
+  # DESCRIPTION: Return the Number of variations to generate. If none, choose 20.
   # RETURNS: number of variations.
   def get_variations()
     if @metadata[:variations] == nil
-      @metadata[:variations] = [2, 3, 4].choose
+      @metadata[:variations] = 20
     end
     return @metadata[:variations]
   end
