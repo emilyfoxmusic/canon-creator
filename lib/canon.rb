@@ -441,7 +441,7 @@ class Canon
       # ARGS: Two notes (midi numbers) and the number of steps needed between them.
       # DESCRIPTION: Finds notes to walk from note 1 to note 2 in a certain number of steps.
       # RETURNS: An array of notes (midi numbers) with this walk.
-      def find_walking_notes(note1, note2, number_of_steps = 1)
+      def find_walking_notes(note1, note2, number_of_steps = 1, parallel_notes = [])
 
         # ARGS: An array and a number to choose (n).
         # DESCRIPTION: Picks n numbers at random from the array.
@@ -454,40 +454,66 @@ class Canon
           return sample
         end
 
-        # Find the index in the scale of the two notes, and get their difference.
+        #TODO
+        if parallel_notes == nil
+          parallel_notes = []
+        end
+
+        # Find the index in the scale of the two notes.
         note1_index = @concrete_scale.index(note1)
         note2_index = @concrete_scale.index(note2)
-        difference_in_index = note1_index - note2_index
-        # Find the notes in between, making sure that the lower note is the first index.
-        if note1_index < note2_index
-          # Extend the note1 range by 2 if possible.
-          for i in 1..2
-            if note1_index - 1 > -1
-              note1_index = note1_index - 1
-            end
-          end
-          # Extend the note2 range by 2 if possible.
-          for i in 1..2
-            if note2_index + 1 < @concrete_scale.length
-              note2_index = note2_index + 1
-            end
-          end
-          note_walk = choose_n(@concrete_scale[note1_index..note2_index], number_of_steps).sort
-        else
-          # Extend the note1 range by 2 if possible.
-          for i in 1..2
-            if note2_index - 1 > -1
-              note2_index = note2_index - 1
-            end
-          end
-          # Extend the note2 range by 2 if possible.
-          for i in 1..2
-            if note1_index + 1 < @concrete_scale.length
-              note1_index = note1_index + 1
-            end
-          end
-          note_walk = choose_n(@concrete_scale[note2_index..note1_index], number_of_steps).sort.reverse
+        # Make sure that index 1 is less than index 2.
+        if note1_index > note2_index
+          tmp = note1_index
+          note1_index = note2_index
+          note2_index = tmp
         end
+        # Extend the note1 range by 2 if possible.
+        for i in 1..2
+          if note1_index - 1 > -1
+            note1_index = note1_index - 1
+          end
+        end
+        # Extend the note2 range by 2 if possible.
+        for i in 1..2
+          if note2_index + 1 < @concrete_scale.length
+            note2_index = note2_index + 1
+          end
+        end
+        # Get all notes between those indexes.
+        possible_notes = @concrete_scale[note1_index..note2_index]
+        # Exclude 2nds, 4ths and 7ths of given notes.
+        bad_indexes = []
+        parallel_notes.map do |parallel_note|
+          # For each parallel note, add the indexes of those clashing notes.
+          parallel_note_index = @concrete_scale.index(parallel_note)
+          # Add all bad indexes below that note to the black list.
+          current_index = parallel_note_index
+          while current_index >= 0
+            difference_in_indexes = parallel_note_index - current_index
+            if [1, 3, 6].include?(difference_in_indexes % 7)
+              bad_indexes << current_index
+            end
+          end
+          # Add all bad indexes above that note to the black list.
+          current_index = parallel_note_index
+          while current_index < possible_notes.length
+            difference_in_indexes = current_index - parallel_note_index
+            if [1, 4, 7].include?(difference_in_indexes % 7)
+              bad_indexes << current_index
+            end
+          end
+        end
+        # Remove bad notes from the list
+        bad_notes = []
+        bad_indexes.map do |bad_index|
+          bad_notes << possible_notes[bad_index]
+        end
+        possible_notes = possible_notes - bad_notes
+        if possible_notes == []
+          raise "Empty possible notes for note1: #{ note1 }, note2: #{ note2 } and parallel notes: #{ parallel_notes }."
+        end
+        note_walk = choose_n(possible_notes, number_of_steps).sort
         return note_walk
       end
 
