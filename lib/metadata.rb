@@ -16,6 +16,7 @@
 # (S) number_of_voices
 # (S) type
 # (S) variations
+# (S) voice_octaves
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -28,6 +29,7 @@
 # (G) get_number_of_voices
 # (G) get_type
 # (G) get_variations
+# (G) get_voice_octaves
 
 class Metadata
 
@@ -245,6 +247,24 @@ class Metadata
     return self
   end
 
+  ## SETTER
+  # ARGS: array of transposition of the voices.
+  # DESCRIPTION: Sets the transposition of the voices.
+  # RETURNS: This Metadata object.
+  def voice_octaves(transposition)
+    @metadata[:voice_octaves] = transposition
+    return self
+  end
+
+  ## SETTER
+  # ARGS: array of sounds.
+  # DESCRIPTION: Sets the transposition of the voices.
+  # RETURNS: This Metadata object.
+  def voices(sounds)
+    @metadata[:voices] = sounds
+    return self
+  end
+
   ## NB: There is an assumption that these will only be called by the canon class- so things are not generated ranomly until they are linked with a canon. These should NOT be used in setters!
 
   ## GETTER
@@ -433,4 +453,35 @@ class Metadata
     end
     return @metadata[:bars_per_chord_prog]
   end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the transposition of each voice.
+  # RETURNS: Array with transposition of each voice.
+  def get_voice_octaves()
+    if @metadata[:voice_octaves] == nil
+      voice_octaves = Array.new(get_number_of_voices)
+      for voice in 0..voice_octaves.length - 1
+        voice_octaves[voice] = :choose
+      end
+      @metadata[:voice_octaves] = voice_octaves
+    end
+    return @metadata[:voice_octaves]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Return the sound for each voice.
+  # RETURNS: Array of voices.
+  def get_voices()
+    if @metadata[:voices] == nil
+      voices = Array.new(get_number_of_voices)
+      for voice in 0..voices.length - 1
+        voices[voice] = :choose
+      end
+      @metadata[:voices] = voices
+    end
+    return @metadata[:voices]
+  end
+
 end
