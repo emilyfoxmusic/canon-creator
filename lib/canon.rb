@@ -118,7 +118,7 @@ class Canon
   def generate_variations()
     @variations = []
     # Multiply the total number of bars by the variation percentage.
-    number_to_generate = Math.ceil(@metadata.get_number_of_bars * (@metadata.get_variations / 100.0))
+    number_to_generate = (@metadata.get_number_of_bars * (@metadata.get_variations / 100.0)).ceil
     for variation in 0..number_to_generate - 1
       this_variation = []
       for beat in 0..@metadata.get_beats_in_bar - 1
@@ -133,12 +133,14 @@ class Canon
     metadata = @metadata
     concrete_scale = @concrete_scale
     chord_progression = @chord_progression
+    variations = @variations
     # Begin the logic block.
     canon_structure_options = MiniKanren.exec do
       # Get the variables that have been passed through.
       @metadata = metadata
       @concrete_scale = concrete_scale
       @chord_progression = chord_progression
+      @variations = variations
       # Extend MiniKanren so that Sonic Pi's methods can be used.
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
@@ -321,26 +323,50 @@ class Canon
 
       def set_rhythm(canon_skeleton, bar, beat)
         # Find the random value associated with this beat.
-        value_for_beat = @variations[bar % @variations.length][beat]
+        value_for_beat = @variations[bar % (@variations.length)][beat]
         # Get the probabilities for splitting the note.
         probabilities = @metadata.get_probabilities
         # If this is the last note then don't split it, otherwise use the value to find out which to transform it to.
         if bar == canon_skeleton.length - 1 && beat == @metadata.get_beats_in_bar - 1
-          canon_skeleton[bar][beat] = [Rational(1)]
+          canon_skeleton[bar][beat][:rhythm] = [Rational(1)]
         else
           if value_for_beat < probabilities[0] # Single note.
-            canon_skeleton[bar][beat] = [Rational(1)]
+            canon_skeleton[bar][beat][:rhythm] = [Rational(1)]
           elsif value_for_beat < probabilities[0] + probabilities[1] # Two notes.
-            canon_skeleton[bar][beat] = [Rational(1,2), Rational(1,2)]
+            canon_skeleton[bar][beat][:rhythm] = [Rational(1,2), Rational(1,2)]
           elsif value_for_beat < probabilities[0] + probabilities[1] + probabilities[2] # Three notes
-            canon_skeleton[bar][beat] = [
+            canon_skeleton[bar][beat][:rhythm] = [
               [Rational(1,2), Rational(1,4), Rational(1,4)],
               [Rational(1,4), Rational(1,4), Rational(1,2)]
             ].choose
           else # Four notes.
-            canon_skeleton[bar][beat] = [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)]
+            canon_skeleton[bar][beat][:rhythm] = [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)]
           end
         end
+      end
+
+      def unify_note(note_var, next_note_var, root_note, overlapping_notes)
+        # TODO remove overlapping notes...
+        # Find notes between this note and the next.
+        return project(next_note_var, lambda do |next_note|
+          project(root_note, lambda do |root_note|
+            # Find the index in the scale of the two notes, and get their difference.
+            root_index = @concrete_scale.index(root_note)
+            next_note_index = @concrete_scale.index(next_note)
+            # Find the notes in between, making sure that the lower note is the first index.
+            if root_index < next_note_index
+              possible_notes = @concrete_scale[root_index..next_note_index]
+            else
+              possible_notes = @concrete_scale[next_note_index..root_index]
+            end
+            # Add all these possible notes as options. TODO shuffle?
+            conde_options = []
+            possible_notes.map do |possible_note|
+              conde_options << eq(note_var, possible_note)
+            end
+            conde(*conde_options.shuffle)
+          end)
+        end)
       end
 
       # Initialise constraints.
@@ -432,11 +458,11 @@ class Canon
       # Now deal with the pitches of the notes.
       # Cycle through the canon, creating new arrays of fresh variables for the notes.
       for bar in 0..canon_skeleton.length - 1
-        for beat in canon_skeleton[bar].length - 1
+        for beat in 0..canon_skeleton[bar].length - 1
           number_of_notes = canon_skeleton[bar][beat][:rhythm].length
           canon_skeleton[bar][beat][:notes] = Array.new(number_of_notes)
           for note in 0..number_of_notes - 1
-            canon_skeleton[bar][beat][:note][note] = fresh
+            canon_skeleton[bar][beat][:notes][note] = fresh
           end
         end
       end
@@ -448,11 +474,11 @@ class Canon
         (@metadata.get_number_of_bars - 1).downto(0) do |bar|
           (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
             # For each note except the first, find those overlapping notes and unify it with those remaining.
-            (canon_skeleton[bar][beat][:notes].length - 1)downto(1) do |note|
+            (canon_skeleton[bar][beat][:notes].length - 1).downto(1) do |note|
               # Find the next note.
               next_note = nil
               if note == canon_skeleton[bar][beat][:notes].length - 1
-                # Next note is in next beat (the root note of it).
+              # Next note is in next beat (the root note of it).
                 if beat == @metadata.get_beats_in_bar - 1
                   # The next beat is in the next bar- the root note.
                   next_note = canon_skeleton[bar + 1][0][:root_note]
@@ -467,7 +493,7 @@ class Canon
               # Find the overlapping notes.
               # TODO
               overlapping_notes = []
-              constraints << unify_note(canon_skeleton[bar][beat][:notes][note], next_note, overlapping_notes)
+              constraints << unify_note(canon_skeleton[bar][beat][:notes][note], next_note, canon_skeleton[bar][beat][:root_note], overlapping_notes)
             end
             # Set the first note to be the root note.
             constraints << eq(canon_skeleton[bar][beat][:notes][0], canon_skeleton[bar][beat][:root_note])
@@ -538,6 +564,7 @@ class Canon
       else
         throw "No such type: #{ @metadata.get_type }"
       end
+
       # Run the query.
       q = fresh
       run(40, q, eq(q, canon_skeleton), *constraints)
@@ -546,387 +573,7 @@ class Canon
     if canon_structure_options.empty?
       raise "No canons available for these settings. Try increasing the range of the piece."
     else
-      @canon_skeleton = canon_structure_options.choose
+      @canon_complete = canon_structure_options.choose
     end
-  end
-
-  # ARGS: None.
-  # DESCRIPTION: Fleshes out the canon by transforming the beats into multiple notes. (Between 1 and 4).
-  # RETURNS: Nil.
-  def populate_canon()
-    # Pass the variables through to MiniKanren.
-    metadata = @metadata
-    concrete_scale = @concrete_scale
-    canon_skeleton = @canon_skeleton
-    chord_progression = @chord_progression
-    variations = @variations
-    # Begin the logic block.
-    populated_canons = MiniKanren.exec do
-      extend SonicPi::Lang::Core
-      extend SonicPi::RuntimeMethods
-      # Get the variables that have been passed through.
-      @metadata = metadata
-      @concrete_scale = concrete_scale
-      canon = canon_skeleton
-      @variations = variations
-      @chord_progression = chord_progression
-      @variation_counter = 0
-
-      def get_next_variation
-        this_variation = @variations[@variation_counter]
-        @variation_counter = (@variation_counter + 1) % @metadata.get_variations
-        return this_variation
-      end
-
-      # ARGS: Two notes (midi numbers) and the number of steps needed between them.
-      # DESCRIPTION: Finds notes to walk from note 1 to note 2 in a certain number of steps.
-      # RETURNS: An array of notes (midi numbers) with this walk.
-      def find_walking_notes(note1, note2, number_of_steps = 1, parallel_notes = [])
-
-        # ARGS: An array and a number to choose (n).
-        # DESCRIPTION: Picks n numbers at random from the array.
-        # RETURNS: Array of n numbers chosen at random from the array.
-        def choose_n(array, n)
-          sample = []
-          for i in 1..n
-            sample << array.choose
-          end
-          return sample
-        end
-
-        #TODO
-        if parallel_notes == nil
-          parallel_notes = []
-        end
-
-        # Find the index in the scale of the two notes.
-        note1_index = @concrete_scale.index(note1)
-        note2_index = @concrete_scale.index(note2)
-        # Make sure that index 1 is less than index 2.
-        if note1_index > note2_index
-          tmp = note1_index
-          note1_index = note2_index
-          note2_index = tmp
-        end
-        # Extend the note1 range by 2 if possible.
-        #        for i in 1..2
-        #          if note1_index - 1 > -1
-        #            note1_index = note1_index - 1
-        #          end
-        #        end
-        #        # Extend the note2 range by 2 if possible.
-        #        for i in 1..2
-        #          if note2_index + 1 < @concrete_scale.length
-        #            note2_index = note2_index + 1
-        #          end
-        #        end
-        # Get all notes between those indexes.
-        possible_notes = @concrete_scale[note1_index..note2_index]
-        # Exclude 2nds, 4ths and 7ths of given notes.
-        bad_indexes = []
-        parallel_notes.map do |parallel_note|
-          # For each parallel note, add the indexes of those clashing notes.
-          parallel_note_index = @concrete_scale.index(parallel_note)
-          # Add all bad indexes below that note to the black list.
-          current_index = parallel_note_index
-          while current_index >= 0
-            difference_in_indexes = parallel_note_index - current_index
-            if [1, 3, 6].include?(difference_in_indexes % 7)
-              bad_indexes << current_index
-            end
-            current_index = current_index - 1
-          end
-          # Add all bad indexes above that note to the black list.
-          current_index = parallel_note_index
-          while current_index < possible_notes.length
-            difference_in_indexes = current_index - parallel_note_index
-            if [1, 4, 7].include?(difference_in_indexes % 7)
-              bad_indexes << current_index
-            end
-            current_index = current_index + 1
-          end
-        end
-        # Remove bad notes from the list
-        bad_notes = []
-        bad_indexes.map do |bad_index|
-          bad_notes << possible_notes[bad_index]
-        end
-        possible_notes = possible_notes - bad_notes
-        if possible_notes.empty?
-          puts "Using the root note- possible notes are empty..."
-          possible_notes = [note1]
-        else
-          puts "All gooood."
-        end
-        note_walk = choose_n(possible_notes, number_of_steps).sort
-        return note_walk
-      end
-
-      # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
-      # DESCRIPTION: Unifies this beat's rhythm and pitches with a more interesting pattern. Randomly pick which transform to do for each beat based on the probabilities.
-      # RETURNS: Nil.
-      def transform_beat(constraints, current_beat, other_beat, is_last_note, fate, parallel_beats)
-        # Get the probabilities.
-        probabilities = @metadata.get_probabilities
-        # Choose which transform to use.
-        if fate < probabilities[0]
-          # Single transform.
-          transform_beat_single(constraints, current_beat)
-        elsif fate < probabilities[0] + probabilities[1]
-          # Double transform.
-          transform_beat_double(constraints, current_beat, other_beat, is_last_note)
-        elsif fate < probabilities[0] + probabilities[1] + probabilities[2]
-          # Triple transform.
-          transform_beat_triple(constraints, current_beat, other_beat, is_last_note, parallel_beats)
-        else
-          # Quadruple transform.
-          transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
-        end
-      end
-
-      # ARGS: The current array of constraints and the MiniKanren variable representing the current beat.
-      # DESCRIPTION: Unifies this beat's rhythm and pitches with a single note (the root note).
-      # RETURNS: Nil.
-      def transform_beat_single(constraints, current_beat)
-        # This note should be the root.
-        constraints << all(eq(current_beat[:rhythm], [Rational(1)]), eq(current_beat[:notes], [current_beat[:root_note]]))
-      end
-
-      # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
-      # DESCRIPTION: Unifies this beat's rhythm and pitches with a double note. The first is the root note, and the second walks to the next beat, unless this is the final note in which case the second note is the root and the first one walks to it.
-      # RETURNS: Nil.
-      def transform_beat_double(constraints, current_beat, other_beat, is_last_note)
-        # Constrain the rhythm.
-        constraints << eq(current_beat[:rhythm], [Rational(1,2), Rational(1,2)])
-        # Constrain the pitch.
-        # Create new variables for each note.
-        n1, n2 = fresh(2)
-        # Unify this beat's pitch with the two notes.
-        constraints << eq(current_beat[:notes], [n1, n2])
-        # Both are the root.
-        constraints << eq(n1, current_beat[:root_note])
-        constraints << eq(n2, current_beat[:root_note])
-      end
-
-      # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
-      # DESCRIPTION: Unifies this beat's rhythm and pitches with a triple note. The first is the root note, and the second and third walk to the next beat, unless this is the final note in which case the third note is the root and the first two walk to it.
-      # RETURNS: Nil.
-      def transform_beat_triple(constraints, current_beat, other_beat, is_last_note, parallel_beats)
-        # Create new variables for each note.
-        n1, n2, n3 = fresh(3)
-        # Unify this beat's pitch with the three notes.
-        constraints << eq(current_beat[:notes], [n1, n2, n3])
-        # The first note is the root and the second two walk to the next root note.
-        constraints << eq(n1, current_beat[:root_note])
-        constraints << eq(n3, current_beat[:root_note])
-        # Add the overlapping notes as a constraint with project.
-        constraints << project(parallel_beats, lambda do |parallel_beats|
-          # Constrain the rhythm and middle note.
-          option1_parallel_notes = []
-          option2_parallel_notes = []
-          option3_parallel_notes = []
-          # Find overlapping with first option.
-          parallel_beats.map do |parallel_beat|
-            case parallel_beat[:rhythm].length
-            when 1
-              # This is an overlapping note for all cases.
-              option1_parallel_notes << parallel_beat[:notes][0]
-              option2_parallel_notes << parallel_beat[:notes][0]
-              option3_parallel_notes << parallel_beat[:notes][0]
-            when 2
-              # Option 1 and option 3 have the first as an overlapping note.
-              option1_parallel_notes << parallel_beat[:notes][0]
-              option3_parallel_notes << parallel_beat[:notes][0]
-              # Option 2 and option 3 has the second one as an overlapping note.
-              option2_parallel_notes << parallel_beat[:notes][1]
-              option3_parallel_notes << parallel_beat[:notes][1]
-            when 3
-              if parallel_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
-                # If the other three is in the first form:
-                # Option one overlaps with the second.
-                option1_parallel_notes << parallel_beat[:notes][1]
-                # Option two overlaps with the first.
-                option2_parallel_notes << parallel_beat[:notes][0]
-                # Option three overlaps with the second and third.
-                option3_parallel_notes << parallel_beat[:notes][1]
-                option3_parallel_notes << parallel_beat[:notes][2]
-              elsif parallel_beat[:rhythm] == [Rational(1,2), Rational(1,4), Rational(1,4)]
-                # If the other three is in the second form:
-                # Option one overlaps with the first.
-                option1_parallel_notes << parallel_beat[:notes][0]
-                # Option two overlaps with the second.
-                option2_parallel_notes << parallel_beat[:notes][1]
-                # Option three overlaps with the first and second.
-                option3_parallel_notes << parallel_beat[:notes][0]
-                option3_parallel_notes << parallel_beat[:notes][1]
-              elsif parallel_beat[:rhythm] == [Rational(1,3), Rational(1,3), Rational(1,3)]
-                # If the other three is in the third form:
-                # Option 1 overlaps with the second and third.
-                option1_parallel_notes << parallel_beat[:notes][1]
-                option1_parallel_notes << parallel_beat[:notes][2]
-                # Option 2 overlaps with the first and second.
-                option2_parallel_notes << parallel_beat[:notes][0]
-                option2_parallel_notes << parallel_beat[:notes][1]
-                # Option three overlaps with the second.
-                option3_parallel_notes << parallel_beat[:notes][1]
-              end
-            when 4
-              # Option one overlaps with the second.
-              option1_parallel_notes << parallel_beat[:notes][1]
-              # Option two overlaps with the third.
-              option2_parallel_notes << parallel_beat[:notes][2]
-              # Option three overlaps with the second and third.
-              option3_parallel_notes << parallel_beat[:notes][1]
-              option3_parallel_notes << parallel_beat[:notes][2]
-            end
-          end
-          conde_options = [
-            all(eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]), eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1, option1_parallel_notes))),
-            all(eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]), eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1, option2_parallel_notes))),
-            all(eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)]), eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1, option3_parallel_notes)))
-          ]
-          conde(*conde_options.shuffle)
-        end
-        )
-      end
-
-      # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
-      # DESCRIPTION: Unifies this beat's rhythm and pitches with a quadruple note. The first is the root note, and the second, third and fourth walk to the next beat, unless this is the final note in which case the fourth note is the root and the first three walk to it.
-      # RETURNS: Nil.
-      def transform_beat_quadruple(constraints, current_beat, other_beat, is_last_note)
-        # Constrain the rhythm.
-        constraints << eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)])
-        # Constrain the pitch.
-        # Create new variables for each note.
-        n1, n2, n3, n4 = fresh(4)
-        # Unify this beat's pitch with the four notes.
-        constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
-        # The first note is the root and the second two walk to the next root note.
-        constraints << eq(n1, current_beat[:root_note])
-        constraints << eq([n2, n3], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
-        constraints << eq(n4, current_beat[:root_note])
-      end
-
-      def transform_beat_intelligent(constraints, canon, variation, bar, beat)
-        other_beat = nil
-        is_last_note = false
-        parallel_beats = []
-        # Get overlapping notes, and call them parallel beats.
-        for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
-          # If this bar exists then add the corresponding beat to the one to watch.
-          if overlapping_bar < @metadata.get_number_of_bars
-            parallel_beats << canon[overlapping_bar][beat]
-          end
-        end
-        if beat < @metadata.get_beats_in_bar - 1 # If the next beat is in this bar, constrain using next beat.
-          other_beat = canon[bar][beat + 1]
-        elsif bar < (@chord_progression.length / @metadata.get_beats_in_bar) - 1 # Else, if it's in the next, constrain using that beat.
-          other_beat = canon[bar + 1][0]
-        else # Else, if there is no next beat (last in variation) then transform with previous beat.
-          other_beat = canon[bar][beat - 1]
-          is_last_note = true
-        end
-        transform_beat(constraints, canon[bar][beat], other_beat, is_last_note, variation[beat], parallel_beats)
-      end
-
-      def are_mirrored(mirror_beat, ground_beat)
-        return project(ground_beat, lambda do |ground_beat|
-          all(
-          eq(mirror_beat[:rhythm], ground_beat[:rhythm].reverse),
-          eq(mirror_beat[:notes], ground_beat[:notes].reverse)
-          )
-        end)
-      end
-
-      # Initialise canon and constraints.
-      constraints = []
-      # Make the notes and rhythms into fresh variables.
-      for bar in 0..canon.length - 1
-        for beat in 0..canon[bar].length - 1
-          canon[bar][beat][:rhythm] = fresh
-          canon[bar][beat][:notes] = fresh
-        end
-      end
-      # Treat each type differently.
-      case @metadata.get_type
-      when :round
-        # Cycle through the bars, tranforming them, last first for the intelligent transform to work!
-        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
-          variation = get_next_variation
-          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-            transform_beat_intelligent(constraints, canon, variation, bar, beat)
-          end
-        end
-      when :crab
-        # Cycle through copies of the chord progression, alternately mirroring and transforming.
-        # Is this version of the chord progression a mirror of the next?
-        mirror = false # MUST start with false.
-        # For the number of cycles of the chord progression that happen in this piece.
-        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
-          # For the offset of bars within this (up to length of chord progression).
-          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
-            # Find the actual bar number.
-            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
-            if mirror
-              # Mirror the notes.
-              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
-                mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
-                constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
-              end
-            else
-              # Just do the transform.
-              variation = get_next_variation
-              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-                transform_beat_intelligent(constraints, canon, variation, bar, beat)
-              end
-            end
-          end
-          # Flip whether we're mirroring or not.
-          mirror = !mirror
-        end
-      when :palindrome
-        # Cycle through to half way through the melody doing the transforms. Exclude central one if odd number of bars.
-        (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
-          variation = get_next_variation
-          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-            transform_beat_intelligent(constraints, canon, variation, bar, beat)
-          end
-        end
-        # ASSERT: the last half is transformed, excluding middle bar if there's an odd number of bars.
-        # If there's an odd number of bars, deal with the middle one.
-        if (@metadata.get_number_of_bars % 2 == 1)
-          variation = get_next_variation
-          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
-            transform_beat_intelligent(constraints, canon, variation, bar, beat)
-          end
-        end
-        # ASSERT: half the canon is unified.
-        # Mirror the canon for the first half.
-        # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
-        if (@metadata.get_number_of_bars % 2 == 1)
-          ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
-            mirrored_bar = @metadata.get_number_of_bars - bar - 1
-            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
-            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
-          end
-        end
-        # The first half mirrors the second half.
-        for bar in 0..((@metadata.get_number_of_bars - 2) / 2)
-          for beat in 0..(@metadata.get_beats_in_bar - 1)
-            mirrored_bar = @metadata.get_number_of_bars - bar - 1
-            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
-            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
-          end
-        end
-      else
-        throw "No such type: #{ @metadata.get_type }"
-      end
-      # Run the query using q, a fresh query variable.
-      q = fresh
-      run(40, q, eq(q, canon), *constraints)
-    end
-    # Choose one of the canons.
-    @canon_complete = populated_canons.choose
   end
 end
