@@ -226,10 +226,10 @@ class Metadata
   # DESCRIPTION: Sets the number of tune variations to generate.
   # RETURNS: This Metadata object.
   def variations(number)
-    if 0 < number && number <= 100
+    if 0 <= number && number <= 100
       @metadata[:variations] = number
     else
-      raise "Invalid number of variations. Must be between 1 and 100."
+      raise "Invalid number of variations. Must be between 0 and 100 percent."
     end
     return self
   end
@@ -242,7 +242,7 @@ class Metadata
     if 0 < number && number <= 10
       @metadata[:bars_per_chord_prog] = number
     else
-      raise "Invalid number of bars per variation. Must be between 1 and 10."
+      raise "Invalid number of bars per chord progression. Must be between 1 and 10."
     end
     return self
   end
@@ -434,22 +434,22 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the Number of variations to generate. If none, choose 20.
+  # DESCRIPTION: Return the Number of variations to generate. If none, choose 50%.
   # RETURNS: number of variations.
   def get_variations()
     if @metadata[:variations] == nil
-      @metadata[:variations] = 20
+      @metadata[:variations] = 50
     end
     return @metadata[:variations]
   end
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the Number of bars per chord progression. If none given, choose a random number between 1 and 4.
+  # DESCRIPTION: Return the Number of bars per chord progression. If none given, choose a random number between 1 and 3.
   # RETURNS: number of variations.
   def get_bars_per_chord_prog()
     if @metadata[:bars_per_chord_prog] == nil
-      @metadata[:bars_per_chord_prog] = [1, 2, 3, 4].choose
+      @metadata[:bars_per_chord_prog] = [1, 2, 3].choose
     end
     return @metadata[:bars_per_chord_prog]
   end

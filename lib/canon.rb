@@ -24,14 +24,12 @@ class Canon
     @concrete_scale = nil
     @chord_progression = nil
     @variations = nil
-    @canon_skeleton = nil
     @canon_complete = nil
     # Generate the canon.
     generate_concrete_scale()
     generate_chord_progression()
     generate_variations()
-    generate_skeleton()
-    populate_canon()
+    generate_canon()
     return self
   end
 
@@ -55,10 +53,6 @@ class Canon
 
   def get_variations
     return @variations
-  end
-
-  def get_skeleton
-    return @canon_skeleton
   end
 
   # ARGS: None.
@@ -123,7 +117,9 @@ class Canon
   # RETURNS: Nil.
   def generate_variations()
     @variations = []
-    for variation in 0..@metadata.get_variations - 1
+    # Multiply the total number of bars by the variation percentage.
+    number_to_generate = Math.ceil(@metadata.get_number_of_bars * (@metadata.get_variations / 100.0))
+    for variation in 0..number_to_generate - 1
       this_variation = []
       for beat in 0..@metadata.get_beats_in_bar - 1
         this_variation << rand()
@@ -132,7 +128,7 @@ class Canon
     end
   end
 
-  def generate_skeleton()
+  def generate_canon()
     # Pass the variables through to MiniKanren.
     metadata = @metadata
     concrete_scale = @concrete_scale
@@ -146,12 +142,12 @@ class Canon
       # Extend MiniKanren so that Sonic Pi's methods can be used.
       extend SonicPi::Lang::Core
       extend SonicPi::RuntimeMethods
-      # Generate the canon skeleton structure, with the root notes as variables.
+      # Generate the canon skeleton structure, with root notes and notes as fresh variables.
       canon_skeleton = Array.new(@metadata.get_number_of_bars) # One cell per bar.
       for bar in 0..@metadata.get_number_of_bars - 1
         canon_skeleton[bar] = Array.new(@metadata.get_beats_in_bar) # One cell per beat.
         for beat in 0..@metadata.get_beats_in_bar - 1
-          canon_skeleton[bar][beat] = {root_note: fresh, notes: nil, rhythm: nil} # The root note is a variable.
+          canon_skeleton[bar][beat] = {root_note: fresh, notes: fresh, rhythm: nil} # The root note is a variable.
         end
       end
 
@@ -323,17 +319,42 @@ class Canon
         end # If not matched then it's the final note which has already been dealt with.
       end
 
+      def set_rhythm(canon_skeleton, bar, beat)
+        # Find the random value associated with this beat.
+        value_for_beat = @variations[bar % @variations.length][beat]
+        # Get the probabilities for splitting the note.
+        probabilities = @metadata.get_probabilities
+        # If this is the last note then don't split it, otherwise use the value to find out which to transform it to.
+        if bar == canon_skeleton.length - 1 && beat == @metadata.get_beats_in_bar - 1
+          canon_skeleton[bar][beat] = [Rational(1)]
+        else
+          if value_for_beat < probabilities[0] # Single note.
+            canon_skeleton[bar][beat] = [Rational(1)]
+          elsif value_for_beat < probabilities[0] + probabilities[1] # Two notes.
+            canon_skeleton[bar][beat] = [Rational(1,2), Rational(1,2)]
+          elsif value_for_beat < probabilities[0] + probabilities[1] + probabilities[2] # Three notes
+            canon_skeleton[bar][beat] = [
+              [Rational(1,2), Rational(1,4), Rational(1,4)],
+              [Rational(1,4), Rational(1,4), Rational(1,2)]
+            ].choose
+          else # Four notes.
+            canon_skeleton[bar][beat] = [Rational(1,4), Rational(1,4), Rational(1,4), Rational(1,4)]
+          end
+        end
+      end
+
       # Initialise constraints.
       constraints = []
       # CONSTRAINT (ALL): Final root note is the tonic.
       constraints << constrain_to_possible_notes(canon_skeleton[@metadata.get_number_of_bars - 1][@metadata.get_beats_in_bar - 1][:root_note], nil, :tonic, [])
-      # Deal with the types individually.
+      # Deal with the types individually. Add constrints for the root notes, and add in the rhythm.
       case @metadata.get_type
       when :round
         # Cycle through the bars, adding constraints that each note is in the chord and different to overlapping ones.
         (@metadata.get_number_of_bars - 1).downto(0) do |bar|
           (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
             add_constraints(constraints, canon_skeleton, bar, beat)
+            set_rhythm(canon_skeleton, bar, beat)
           end
         end
       when :crab
@@ -352,11 +373,14 @@ class Canon
                 mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
                 mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
                 constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+                # Rhythm is the reverse of the mirrored beat.
+                canon_skeleton[bar][beat][:rhythm] = canon_skeleton[mirrored_bar][mirrored_beat][:rhythm].reverse
               end
             else
               # Just generate some more music.
               (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
                 add_constraints(constraints, canon_skeleton, bar, beat)
+                set_rhythm(canon_skeleton, bar, beat)
               end
             end
           end
@@ -368,6 +392,7 @@ class Canon
         (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
           (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
             add_constraints(constraints, canon_skeleton ,bar, beat)
+            set_rhythm(canon_skeleton, bar, beat)
           end
         end
         # ASSERT: the last half is unified, excluding middle bar if there's an odd number of bars.
@@ -375,6 +400,7 @@ class Canon
         if (@metadata.get_number_of_bars % 2 == 1)
           (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
             add_constraints(constraints, canon_skeleton,bar, beat)
+            set_rhythm(canon_skeleton, bar, beat)
           end
         end
         # ASSERT: half the canon is unified.
@@ -385,6 +411,8 @@ class Canon
             mirrored_bar = @metadata.get_number_of_bars - bar - 1
             mirrored_beat = @metadata.get_beats_in_bar - beat - 1
             constraints << eq(canon_skeleton[bar][bar][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+            # Rhythm is the reverse of the mirrored beat.
+            canon_skeleton[bar][beat][:rhythm] = canon_skeleton[mirrored_bar][mirrored_beat][:rhythm].reverse
           end
         end
         # The first half mirrors the second half.
@@ -393,6 +421,118 @@ class Canon
             mirrored_bar = @metadata.get_number_of_bars - bar - 1
             mirrored_beat = @metadata.get_beats_in_bar - beat - 1
             constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+            # Rhythm is the reverse of the mirrored beat.
+            canon_skeleton[bar][beat][:rhythm] = canon_skeleton[mirrored_bar][mirrored_beat][:rhythm].reverse
+          end
+        end
+      else
+        throw "No such type: #{ @metadata.get_type }"
+      end
+      # ASSERT: the root notes now have been unified, and the rhythm is fixed.
+      # Now deal with the pitches of the notes.
+      # Cycle through the canon, creating new arrays of fresh variables for the notes.
+      for bar in 0..canon_skeleton.length - 1
+        for beat in canon_skeleton[bar].length - 1
+          number_of_notes = canon_skeleton[bar][beat][:rhythm].length
+          canon_skeleton[bar][beat][:notes] = Array.new(number_of_notes)
+          for note in 0..number_of_notes - 1
+            canon_skeleton[bar][beat][:note][note] = fresh
+          end
+        end
+      end
+      # Cycle through the bars, last bar first, unifying first note with the root and the others with notes that don't clash with overlapping notes.
+      # Treat each type differently.
+      case @metadata.get_type
+      when :round
+        # Cycle through the bars, tranforming them, last first.
+        (@metadata.get_number_of_bars - 1).downto(0) do |bar|
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            # For each note except the first, find those overlapping notes and unify it with those remaining.
+            (canon_skeleton[bar][beat][:notes].length - 1)downto(1) do |note|
+              # Find the next note.
+              next_note = nil
+              if note == canon_skeleton[bar][beat][:notes].length - 1
+                # Next note is in next beat (the root note of it).
+                if beat == @metadata.get_beats_in_bar - 1
+                  # The next beat is in the next bar- the root note.
+                  next_note = canon_skeleton[bar + 1][0][:root_note]
+                else
+                  # The next beat is in this bar.
+                  next_note = canon_skeleton[bar][beat + 1][:root_note]
+                end
+              else
+                # The next note is in this beat.
+                next_note = canon_skeleton[bar][beat][:notes][note + 1]
+              end
+              # Find the overlapping notes.
+              # TODO
+              overlapping_notes = []
+              constraints << unify_note(canon_skeleton[bar][beat][:notes][note], next_note, overlapping_notes)
+            end
+            # Set the first note to be the root note.
+            constraints << eq(canon_skeleton[bar][beat][:notes][0], canon_skeleton[bar][beat][:root_note])
+          end
+        end
+      when :crab
+        # Cycle through copies of the chord progression, alternately mirroring and transforming.
+        # Is this version of the chord progression a mirror of the next?
+        mirror = false # MUST start with false.
+        # For the number of cycles of the chord progression that happen in this piece.
+        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
+          # For the offset of bars within this (up to length of chord progression).
+          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
+            # Find the actual bar number.
+            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
+            if mirror
+              # Mirror the notes.
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
+                mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
+                constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+              end
+            else
+              # Just do the transform.
+              variation = get_next_variation
+              (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+                transform_beat_intelligent(constraints, canon, variation, bar, beat)
+              end
+            end
+          end
+          # Flip whether we're mirroring or not.
+          mirror = !mirror
+        end
+      when :palindrome
+        # Cycle through to half way through the melody doing the transforms. Exclude central one if odd number of bars.
+        (@metadata.get_number_of_bars - 1).downto((@metadata.get_number_of_bars + 1) / 2) do |bar|
+          variation = get_next_variation
+          (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
+            transform_beat_intelligent(constraints, canon, variation, bar, beat)
+          end
+        end
+        # ASSERT: the last half is transformed, excluding middle bar if there's an odd number of bars.
+        # If there's an odd number of bars, deal with the middle one.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          variation = get_next_variation
+          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
+            transform_beat_intelligent(constraints, canon, variation, bar, beat)
+          end
+        end
+        # ASSERT: half the canon is unified.
+        # Mirror the canon for the first half.
+        # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
+        if (@metadata.get_number_of_bars % 2 == 1)
+          ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+          end
+        end
+        # The first half mirrors the second half.
+        for bar in 0..((@metadata.get_number_of_bars - 2) / 2)
+          for beat in 0..(@metadata.get_beats_in_bar - 1)
+            mirrored_bar = @metadata.get_number_of_bars - bar - 1
+            mirrored_beat = @metadata.get_beats_in_bar - beat - 1
+            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
           end
         end
       else
@@ -469,17 +609,17 @@ class Canon
           note2_index = tmp
         end
         # Extend the note1 range by 2 if possible.
-#        for i in 1..2
-#          if note1_index - 1 > -1
-#            note1_index = note1_index - 1
-#          end
-#        end
-#        # Extend the note2 range by 2 if possible.
-#        for i in 1..2
-#          if note2_index + 1 < @concrete_scale.length
-#            note2_index = note2_index + 1
-#          end
-#        end
+        #        for i in 1..2
+        #          if note1_index - 1 > -1
+        #            note1_index = note1_index - 1
+        #          end
+        #        end
+        #        # Extend the note2 range by 2 if possible.
+        #        for i in 1..2
+        #          if note2_index + 1 < @concrete_scale.length
+        #            note2_index = note2_index + 1
+        #          end
+        #        end
         # Get all notes between those indexes.
         possible_notes = @concrete_scale[note1_index..note2_index]
         # Exclude 2nds, 4ths and 7ths of given notes.
