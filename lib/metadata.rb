@@ -7,16 +7,17 @@
 # INTERFACE METHODS: (S) = setter and (G) = getter
 # (S) key_note
 # (S) key_type
-# (S) time_signature
+# (S) beats_per_bar
 # (S) lowest_note
 # (S) highest_note
 # (S) max_jump
 # (S) probabilities
 # (S) number_of_bars
 # (S) number_of_voices
+# (S) voice_offset
 # (S) type
-# (S) variations
-# (S) voice_octaves
+# (S) variation
+# (S) voice_transpositions
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -30,6 +31,7 @@
 # (G) get_type
 # (G) get_variations
 # (G) get_voice_octaves
+# (G) get_offset
 
 class Metadata
 
@@ -103,15 +105,19 @@ class Metadata
 
   ## SETTER
   # ARGS: The time signature.
-  # DESCRIPTION: Set the time signature. Only 3/4 and 4/4 are supported.
+  # DESCRIPTION: Set the time signature. Only 3 and 4 are supported.
   # RETURNS: This Metadata object.
-  def time_signature(time_sig)
+  def beats_per_bar(time_sig)
     # Specify valid time signatures.
-    valid_time_sigs = ["3/4", "4/4"]
-    if valid_time_sigs.include?(time_sig)
-      @metadata[:time_sig] = time_sig
+    valid_beats = [3, 4]
+    if valid_beats.include?(time_sig)
+      if time_sig == 3
+        @metadata[:time_sig] = "3/4"
+      else
+        @metadata[:time_sig] = "4/4"
+      end
     else
-      raise "The time signature #{ time_sig } is not supported."
+      raise "The number of beats #{ time_sig } is not supported- must be 3 or 4."
     end
     return self
   end
@@ -124,7 +130,7 @@ class Metadata
     note_number = SonicPi::Note.resolve_midi_note(note)
     # Ensure the range is at least an octave.
     if @metadata[:highest_note] != nil
-      if note_number <= SonicPi::Note.resolve_midi_note(@metadata[:highest_note]) - 12
+      if note_number <= SonicPi::Note.resolve_midi_note(@metadata[:highest_note]) - 24
         @metadata[:lowest_note] = note
       else
         raise "The range must cover one octave, minimum. For a 4/4 piece more is needed."
@@ -144,7 +150,7 @@ class Metadata
     note_number = SonicPi::Note.resolve_midi_note(note)
     # Ensure the range is at least an octave.
     if @metadata[:lowest_note] != nil
-      if note_number >= SonicPi::Note.resolve_midi_note(@metadata[:lowest_note]) + 12
+      if note_number >= SonicPi::Note.resolve_midi_note(@metadata[:lowest_note]) + 24
         @metadata[:highest_note] = note
       else
         raise "The range must cover one octave, minimum."
@@ -177,9 +183,9 @@ class Metadata
   def probabilities(prob)
     # Must be length 4 and must add up to 1.
     if prob.length == 4
-      sum = 0
-      prob.map { |x| sum += x }
-      if sum == 1
+      sum = Rational(0)
+      prob.map { |x| sum += Rational(x.abs.to_s) }
+      if sum == Rational(1)
         @metadata[:probabilities] = prob
       else
         raise "Probabilities do not add up to 1."
@@ -192,19 +198,27 @@ class Metadata
 
   ## SETTER
   # ARGS: Number of bars in the piece (minimum).
-  # DESCRIPTION: Sets the number of bars in the piece. This is the minimum number and may be increased in practice to fit the type.
+  # DESCRIPTION: Sets the number of bars in the piece. There is a maximum of 50 and a minimum of 2.
   # RETURNS: This Metadata object.
   def number_of_bars(n)
-    @metadata[:number_of_bars] = n
+    if n > 1 && n <= 50
+      @metadata[:number_of_bars] = n
+    else
+      raise "The number of bars cannot exceed 50."
+    end
     return self
   end
 
   ## SETTER
   # ARGS: Number of voices.
-  # DESCRIPTION: Sets the number of voices for this piece.
+  # DESCRIPTION: Sets the number of voices for this piece. Must be between 1 and 4.
   # RETURNS: This Metadata object.
   def number_of_voices(n)
-    @metadata[:number_of_voices] = n
+    if [1, 2, 3, 4].include?(n)
+      @metadata[:number_of_voices] = n
+    else
+      raise "There must be 1, 2, 3 or 4 voices, not #{ n }."
+    end
     return self
   end
 
@@ -222,45 +236,53 @@ class Metadata
   end
 
   ## SETTER
-  # ARGS: Number of variations.
-  # DESCRIPTION: Sets the number of tune variations to generate.
+  # ARGS: Percentage variation.
+  # DESCRIPTION: Sets the number of tune variations to generate, as a percentage of the piece length (between 1 and 100).
   # RETURNS: This Metadata object.
-  def variations(number)
+  def variation(number)
     if 0 < number && number <= 100
       @metadata[:variations] = number
     else
-      raise "Invalid number of variations. Must be between 1 and 100."
+      raise "Invalid variation percentage. Must be between 1 and 100."
     end
     return self
   end
 
   ## SETTER
-  # ARGS: number of bars per variation.
-  # DESCRIPTION: Sets the number of bars per variation. Must be between 1 and 10.
+  # ARGS: Number of bars per variation.
+  # DESCRIPTION: Sets the number of bars before the next voice comes in. Must be between 1 and 4.
   # RETURNS: This Metadata object.
-  def bars_per_chord_prog(number)
-    if 0 < number && number <= 10
+  def voice_offset(number)
+    if [1, 2, 3, 4].include?(number)
       @metadata[:bars_per_chord_prog] = number
     else
-      raise "Invalid number of bars per variation. Must be between 1 and 10."
+      raise "Invalid offset: #{ number }. It must be between 1 and 4."
     end
     return self
   end
 
   ## SETTER
-  # ARGS: array of transposition of the voices.
+  # ARGS: Array of transposition of the voices, in octaves.
   # DESCRIPTION: Sets the transposition of the voices.
   # RETURNS: This Metadata object.
-  def voice_octaves(transposition)
+  def voice_transpositions(transposition)
+    transposition.map do |transposition|
+      if ![0, 1, -1, 2, -2].include?(transposition)
+        raise "Invalid transposition: #{ transposition }. Only -2, -1, 0, 1 and 2 are valid."
+      end
+    end
     @metadata[:voice_octaves] = transposition
     return self
   end
 
   ## SETTER
-  # ARGS: array of sounds.
-  # DESCRIPTION: Sets the transposition of the voices.
+  # ARGS: Array of voices (sounds).
+  # DESCRIPTION: Sets the voice type of the parts.
   # RETURNS: This Metadata object.
-  def voices(sounds)
+  def sounds(sounds)
+    if !sounds.is_a?(Array)
+      raise "Invalid sounds: #{ sounds }. It must be an array of synth types."
+    end
     @metadata[:voices] = sounds
     return self
   end
@@ -315,7 +337,7 @@ class Metadata
   def get_time_signature()
     # If there isn't a time signature chosen, then generate one.
     if @metadata[:time_sig] == nil
-      self.time_signature(["3/4", "4/4"].choose)
+      self.beats_per_bar([3, 4].choose)
     end
     return @metadata[:time_sig]
   end
@@ -394,7 +416,7 @@ class Metadata
   # RETURNS: Array of probabilities.
   def get_probabilities()
     if @metadata[:probabilities] == nil
-      self.probabilities([0.35, 0.3, 0.3, 0.05])
+      self.probabilities([0.5, 0.25, 0.15, 0.1])
     end
     return @metadata[:probabilities]
   end
@@ -416,7 +438,7 @@ class Metadata
   # RETURNS: Number of voices.
   def get_number_of_voices()
     if @metadata[:number_of_voices] == nil
-      @metadata[:number_of_voices] = get_beats_in_bar
+      @metadata[:number_of_voices] = 2
     end
     return @metadata[:number_of_voices]
   end
@@ -434,11 +456,11 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the Number of variations to generate. If none, choose 20.
+  # DESCRIPTION: Return the Number of variations to generate. If none, choose between 50 and 100.
   # RETURNS: number of variations.
-  def get_variations()
+  def get_variation()
     if @metadata[:variations] == nil
-      @metadata[:variations] = 20
+      @metadata[:variations] = [50, 100].choose
     end
     return @metadata[:variations]
   end
@@ -447,9 +469,9 @@ class Metadata
   # ARGS: None.
   # DESCRIPTION: Return the Number of bars per chord progression. If none given, choose a random number between 1 and 4.
   # RETURNS: number of variations.
-  def get_bars_per_chord_prog()
+  def get_offset()
     if @metadata[:bars_per_chord_prog] == nil
-      @metadata[:bars_per_chord_prog] = [1, 2, 3, 4].choose
+      @metadata[:bars_per_chord_prog] = [1, 2].choose
     end
     return @metadata[:bars_per_chord_prog]
   end
@@ -458,13 +480,18 @@ class Metadata
   # ARGS: None.
   # DESCRIPTION: Return the transposition of each voice.
   # RETURNS: Array with transposition of each voice.
-  def get_voice_octaves()
+  def get_transpositions()
     if @metadata[:voice_octaves] == nil
       voice_octaves = Array.new(get_number_of_voices)
       for voice in 0..voice_octaves.length - 1
-        voice_octaves[voice] = :choose
+        voice_octaves[voice] = [0, 0, 0, -1].choose
       end
       @metadata[:voice_octaves] = voice_octaves
+    elsif @metadata[:voice_octaves].length < get_number_of_voices
+      # Append some more until it is the right length.
+      for i in 1..(get_number_of_voices - @metadata[:voice_octaves].length)
+        @metadata[:voice_octaves] << [0, 0, 0, -1].choose
+      end
     end
     return @metadata[:voice_octaves]
   end
@@ -473,13 +500,18 @@ class Metadata
   # ARGS: None.
   # DESCRIPTION: Return the sound for each voice.
   # RETURNS: Array of voices.
-  def get_voices()
+  def get_sounds()
     if @metadata[:voices] == nil
       voices = Array.new(get_number_of_voices)
       for voice in 0..voices.length - 1
         voices[voice] = :choose
       end
       @metadata[:voices] = voices
+    elsif @metadata[:voices].length < get_number_of_voices
+      # Append some more until it is the right length.
+      for i in 1..(get_number_of_voices - @metadata[:voices].length)
+        @metadata[:voices] << [:pretty_bell, :saw, :prophet, :beep].choose
+      end
     end
     return @metadata[:voices]
   end

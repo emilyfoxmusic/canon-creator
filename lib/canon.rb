@@ -91,7 +91,7 @@ class Canon
   # RETURNS: Nil.
   def generate_chord_progression()
     # Create a new array with a chord for each beat, with the number of beats dictated by the metadata.
-    @chord_progression = Array.new(@metadata.get_beats_in_bar * @metadata.get_bars_per_chord_prog)
+    @chord_progression = Array.new(@metadata.get_beats_in_bar * @metadata.get_offset)
     # State which chords are available
     chord_choice = [:I, :IV, :V, :VI]
     if @metadata.get_type == :round
@@ -119,11 +119,12 @@ class Canon
   end
 
   # ARGS: None.
-  # DESCRIPTION: Generates variationswhich are arrays of uniform random variables to specify which transformation to do.
+  # DESCRIPTION: Generates variations which are arrays of uniform random variables to specify which transformation to do.
   # RETURNS: Nil.
   def generate_variations()
     @variations = []
-    for variation in 0..@metadata.get_variations - 1
+    number_of_variations = (@metadata.get_number_of_bars * (@metadata.get_variation / 100.0)).ceil
+    for variation in 0..number_of_variations - 1
       this_variation = []
       for beat in 0..@metadata.get_beats_in_bar - 1
         this_variation << rand()
@@ -304,7 +305,7 @@ class Canon
       # RETURNS: Nil.
       def add_constraints(constraints, canon_skeleton, bar, beat)
         used_notes_in_this_position = []
-        for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
+        for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_offset)
           # If this bar exists then add the corresponding beat to the one to watch.
           if overlapping_bar < @metadata.get_number_of_bars
             used_notes_in_this_position << canon_skeleton[overlapping_bar][beat][:root_note]
@@ -312,7 +313,7 @@ class Canon
         end
         # Constrain the notes.
         # Find the chord for this beat.
-        chord_for_beat = @chord_progression[beat + @metadata.get_beats_in_bar * (bar % @metadata.get_bars_per_chord_prog)]
+        chord_for_beat = @chord_progression[beat + @metadata.get_beats_in_bar * (bar % @metadata.get_offset)]
         # Split depending on which beat this is.
         if beat < @metadata.get_beats_in_bar - 1 # The next beat is in the same bar.
           new_constraint = constrain_to_possible_notes(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar][beat + 1][:root_note], chord_for_beat, used_notes_in_this_position)
@@ -341,15 +342,15 @@ class Canon
         # Is this version of the chord progression a mirror of the next?
         mirror = false # MUST start with false.
         # For the number of cycles of the chord progression that happen in this piece.
-        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
+        ((@metadata.get_number_of_bars - 1) / @metadata.get_offset).downto(0) do |chord_progression_count|
           # For the offset of bars within this (up to length of chord progression).
-          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
+          (@metadata.get_offset - 1).downto(0) do |bar_offset|
             # Find the actual bar number.
-            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
+            bar = chord_progression_count * @metadata.get_offset + bar_offset
             if mirror
               # Mirror the next version of the chord progression.
               (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
+                mirrored_bar = (chord_progression_count + 1) * @metadata.get_offset + (@metadata.get_offset - 1 - bar_offset)
                 mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
                 constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
               end
@@ -433,8 +434,9 @@ class Canon
       @variation_counter = 0
 
       def get_next_variation
+        number_of_variations = (@metadata.get_number_of_bars * (@metadata.get_variation / 100.0)).ceil
         this_variation = @variations[@variation_counter]
-        @variation_counter = (@variation_counter + 1) % @metadata.get_variations
+        @variation_counter = (@variation_counter + 1) % number_of_variations
         return this_variation
       end
 
@@ -532,8 +534,9 @@ class Canon
         n1, n2 = fresh(2)
         # Unify this beat's pitch with the two notes.
         constraints << eq(current_beat[:notes], [n1, n2])
-        # Both are the root.
+        # The first is the root.
         constraints << eq(n1, current_beat[:root_note])
+        # The second is a walking note.
         constraints << eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1))
       end
 
@@ -623,15 +626,15 @@ class Canon
         # Is this version of the chord progression a mirror of the next?
         mirror = false # MUST start with false.
         # For the number of cycles of the chord progression that happen in this piece.
-        ((@metadata.get_number_of_bars - 1) / @metadata.get_bars_per_chord_prog).downto(0) do |chord_progression_count|
+        ((@metadata.get_number_of_bars - 1) / @metadata.get_offset).downto(0) do |chord_progression_count|
           # For the offset of bars within this (up to length of chord progression).
-          (@metadata.get_bars_per_chord_prog - 1).downto(0) do |bar_offset|
+          (@metadata.get_offset - 1).downto(0) do |bar_offset|
             # Find the actual bar number.
-            bar = chord_progression_count * @metadata.get_bars_per_chord_prog + bar_offset
+            bar = chord_progression_count * @metadata.get_offset + bar_offset
             if mirror
               # Mirror the notes.
               (@metadata.get_beats_in_bar - 1).downto(0) do |beat|
-                mirrored_bar = (chord_progression_count + 1) * @metadata.get_bars_per_chord_prog + (@metadata.get_bars_per_chord_prog - 1 - bar_offset)
+                mirrored_bar = (chord_progression_count + 1) * @metadata.get_offset + (@metadata.get_offset - 1 - bar_offset)
                 mirrored_beat = @metadata.get_beats_in_bar - 1 - beat
                 constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
               end

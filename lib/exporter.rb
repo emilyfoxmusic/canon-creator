@@ -446,7 +446,7 @@ class Exporter
         lp = "\\new Staff {\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ convert_key_note_to_lilypond(@key_sig_note) } \\#{ @key_sig_type.to_s }\n"
         # Add start rests, staff number * bars per chord progression.
         one_bar_rest = (@time_sig == "3/4") ? "R2." : "R1"
-        for bar in 1..(@canon.get_metadata.get_bars_per_chord_prog * staff)
+        for bar in 1..(@canon.get_metadata.get_offset * staff)
           lp = lp + one_bar_rest + " "
         end
         # Add the notes.
@@ -454,7 +454,7 @@ class Exporter
           lp << "#{ note } "
         end
         # Add rests to the end.
-        for bar in 1..((@num_voices - 1 - staff) * @canon.get_metadata.get_bars_per_chord_prog)
+        for bar in 1..((@num_voices - 1 - staff) * @canon.get_metadata.get_offset)
           lp = lp + one_bar_rest + " "
         end
         whole = whole + lp + "}\n"

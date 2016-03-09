@@ -23,14 +23,8 @@ define :canon_play do |canon_arg|
   # DESCRIPTION: Plays the melody by playing each bar in turn.
   # RETURNS: Nil.
   define :play_melody do |melody, pan, voice, transpose|
-    if voice == :choose
-      voice = [:pretty_bell, :saw, :prophet].choose
-    end
     use_synth voice
-    if transpose == :choose
-      transpose = [0, 0, 0, 0, -12].choose
-    end
-    use_transpose transpose
+    use_transpose transpose * 12
     num_bars = melody.length
     for i in 0..num_bars - 1
       play_bar(melody[i], pan)
@@ -76,9 +70,9 @@ define :canon_play do |canon_arg|
   else
     # Find how many voices to play- this is the same as beats in a bar.
     num_voices = canon.get_metadata.get_number_of_voices
-    offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_bars_per_chord_prog
-    voices = canon.get_metadata.get_voices
-    transpositions = canon.get_metadata.get_voice_octaves
+    offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_offset
+    voices = canon.get_metadata.get_sounds
+    transpositions = canon.get_metadata.get_transpositions
     # Play the melody the correct number of times at the different offsets.
     for voice in 0..num_voices - 1
       in_thread do
