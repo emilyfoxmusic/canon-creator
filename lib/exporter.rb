@@ -18,7 +18,7 @@ class Exporter
   # ARGS: A canon object and file location string
   # DESCRIPTION: Creates an exporter object, by initiasing the member variables.
   # RETURNS: This exporter object.
-  def initialize(canon, file_loc, title, composer)
+  def initialize(canon, file_loc, title, composer, bpm)
     @canon = canon
     @time_sig = canon.get_metadata.get_time_signature
     @key_sig_note = canon.get_metadata.get_key_note
@@ -27,6 +27,7 @@ class Exporter
     @file_loc = file_loc
     @title = title
     @composer = composer
+    @bpm = bpm
     @notes = []
     return self
   end
@@ -466,8 +467,13 @@ class Exporter
         end
         # Get the instrument name.
         instrument = @canon.get_metadata.get_sounds[staff].capitalize
+        # Find the tempo (if specified)
+        tempo_string = ""
+        if @bpm != nil
+          tempo_string = "\\tempo 4 = #{ @bpm }\n"
+        end
         # Add the staff information- clef, time signature, key signature etc..
-        lp = "\\new Staff \\with {\ninstrumentName = \#\"#{ instrument }\"\n}\n{\n\\transpose #{ lilypond_key_note } #{ lilypond_key_note }#{ transpose_adjustment } {\n\\clef #{ clef }\n\\time #{ @time_sig }\n\\key #{ lilypond_key_note } \\#{ @key_sig_type.to_s }\n"
+        lp = "\\new Staff \\with {\ninstrumentName = \#\"#{ instrument }\"\n}\n{\n#{ tempo_string }\\transpose #{ lilypond_key_note } #{ lilypond_key_note }#{ transpose_adjustment } {\n\\clef #{ clef }\n\\time #{ @time_sig }\n\\key #{ lilypond_key_note } \\#{ @key_sig_type.to_s }\n"
         # Add start rests, staff number * bars per chord progression.
         one_bar_rest = (@time_sig == "3/4") ? "R2." : "R1"
         for bar in 1..(@canon.get_metadata.get_offset * staff)
