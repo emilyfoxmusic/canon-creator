@@ -498,7 +498,7 @@ class Canon
         # Get the probabilities.
         probabilities = @metadata.get_probabilities
         # Choose which transform to use.
-        if fate < probabilities[0]
+        if is_last_note || fate < probabilities[0]
           # Single transform.
           transform_beat_single(constraints, current_beat)
         elsif fate < probabilities[0] + probabilities[1]
@@ -544,8 +544,8 @@ class Canon
         # Constrain the rhythm.
         conde_options = [
           eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
-          eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)]),
-          eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+          eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)])
+          #eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
         ]
         constraints << conde(*conde_options.shuffle)
         # Constrain the pitch.
@@ -572,8 +572,8 @@ class Canon
         constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
         # The first note is the root and the second two walk to the next root note.
         constraints << eq(n1, current_beat[:root_note])
-        constraints << eq([n2, n3], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
-        constraints << eq(n4, current_beat[:root_note])
+        constraints << eq([n2, n4], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
+        constraints << eq(n3, current_beat[:root_note])
       end
 
       def transform_beat_intelligent(constraints, canon, variation, bar, beat)
