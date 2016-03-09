@@ -345,28 +345,67 @@ class Canon
         end
       end
 
+      def get_clashing_notes(overlapping_notes)
+        # Initialise the bad notes to [].
+        bad_notes = []
+        # For every overlapping note, keep only those clashing ones.
+        overlapping_notes.map do |overlapping_note|
+          # Initialise the bad notes to the concrete scale.
+          bad_notes_individual = @concrete_scale
+          # Remove those that are compatible (those that are thirds, fifths and sixths so have a difference of 3, 4, 7, 8 or 9 modulo 12).
+          bad_notes_individual = bad_notes_individual.select { |note| !([0,3,4,7,8,9].include?((note - overlapping_note).abs % 12)) }
+          bad_notes = bad_notes + bad_notes_individual
+        end
+        puts bad_notes
+        return bad_notes
+      end
+
       def unify_note(note_var, next_note_var, root_note, overlapping_notes)
         # Find notes between this note and the next.
         return project(next_note_var, lambda do |next_note|
           project(root_note, lambda do |root_note|
-            project(overlapping_notes, lambda do |overlapping_note|
+            project(overlapping_notes, lambda do |overlapping_notes|
+              # Find all the notes that clash with the overlapping notes.
+              bad_notes = get_clashing_notes(overlapping_notes)
               # Find the index in the scale of the two notes, and get their difference.
-              root_index = @concrete_scale.index(root_note)
               next_note_index = @concrete_scale.index(next_note)
-              # Find the notes in between, making sure that the lower note is the first index.
-              if root_index < next_note_index
-                possible_notes = @concrete_scale[root_index..next_note_index]
+              root_index = next_note_index
+              # Make sure that index 1 is less than index 2.
+              if root_index > next_note_index
+                tmp = root_index
+                root_index = next_note_index
+                next_note_index = tmp
+              end
+              # Extend the root range by 2 if possible.
+              for i in 1..2
+                if root_index - 1 > -1
+                  root_index = root_index - 1
+                end
+              end
+              # Extend the next_note range by 2 if possible.
+              for i in 1..1
+                if next_note_index + 1 < @concrete_scale.length
+                  next_note_index = next_note_index + 1
+                end
+              end
+              # Find the notes in between.
+              possible_notes = @concrete_scale[root_index..next_note_index]
+              # Take the difference of the two arrays to get the final possibilities.
+              possible_notes = possible_notes - bad_notes - [next_note]
+              if possible_notes.empty?
+                puts "Possible notes are empty...backtracking."
+                # FAIL.
+                lambda { |x| nil }
               else
-                possible_notes = @concrete_scale[next_note_index..root_index]
+                possible_notes = possible_notes.shuffle
+                puts "All gooood. #{ possible_notes }"
+                # Add all these possible notes as options.
+                conde_options = []
+                possible_notes.map do |possible_note|
+                  conde_options << eq(note_var, possible_note)
+                end
+                conde(*conde_options)
               end
-              # Select only those notes that don't overlap.
-              possible_notes = possible_notes.select { |possible_note| !overlapping_notes.include?(possible_note) }
-              # Add all these possible notes as options.
-              conde_options = []
-              possible_notes.map do |possible_note|
-                conde_options << eq(note_var, possible_note)
-              end
-              conde(*conde_options.shuffle)
             end)
           end)
         end)
@@ -376,7 +415,7 @@ class Canon
       constraints = []
       # CONSTRAINT (ALL): Final root note is the tonic.
       constraints << constrain_to_possible_notes(canon_skeleton[@metadata.get_number_of_bars - 1][@metadata.get_beats_in_bar - 1][:root_note], nil, :tonic, [])
-      # Deal with the types individually. Add constrints for the root notes, and add in the rhythm.
+      # Deal with the types individually. Add constraints for the root notes, and add in the rhythm.
       case @metadata.get_type
       when :round
         # Cycle through the bars, adding constraints that each note is in the chord and different to overlapping ones.
@@ -482,7 +521,7 @@ class Canon
               # Find the next note.
               next_note = nil
               if note == current_beat[:notes].length - 1
-              # Next note is in next beat (the root note of it).
+                # Next note is in next beat (the root note of it).
                 if beat == @metadata.get_beats_in_bar - 1
                   # The next beat is in the next bar- the root note.
                   next_note = canon_skeleton[bar + 1][0][:root_note]
@@ -496,60 +535,62 @@ class Canon
               end
               # Find the overlapping notes.
               overlapping_notes = []
-              # Get overlapping notes, and call them parallel beats.
-              for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
-                # If this bar exists then add the corresponding beat to the one to watch.
-                if overlapping_bar < @metadata.get_number_of_bars
-                  overlapping_beat = canon_skeleton[overlapping_bar][beat]
-                  # Split on the rhythm for THE OVERLAPPING beat
-                  case overlapping_beat[:rhythm].length
-                  when 1
-                    # Defintely overlaps
-                    overlapping_notes << overlapping_beat[:root_note]
-                  when 2
-                    # In all cases except the 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the second note.
-                    if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
+              # Get overlapping notes, if this is not the 4th note, or the 2nd.
+              if note == 2
+                for overlapping_bar in (bar + 1)..(bar + (@metadata.get_number_of_voices - 1) * @metadata.get_bars_per_chord_prog)
+                  # If this bar exists then add the corresponding beat to the one to watch.
+                  if overlapping_bar < @metadata.get_number_of_bars
+                    overlapping_beat = canon_skeleton[overlapping_bar][beat]
+                    # Split on the rhythm for THE OVERLAPPING beat
+                    case overlapping_beat[:rhythm].length
+                    when 1
+                      # Defintely overlaps
                       overlapping_notes << overlapping_beat[:notes][0]
-                    else
-                      overlapping_notes << overlapping_beat[:notes][1]
-                    end
-                  when 3
-                    # Check the rhythm of the overlapping note.
-                    if current_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
-                      # In all cases except the 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the third note.
+                    when 2
+                      # In all cases except the 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the second note.
+                      if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
+                        overlapping_notes << overlapping_beat[:notes][0]
+                      else
+                        overlapping_notes << overlapping_beat[:notes][1]
+                      end
+                    when 3
+                      # Check the rhythm of the overlapping note.
+                      if current_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
+                        # In all cases except the 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the third note.
+                        if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
+                          overlapping_notes << overlapping_beat[:notes][1]
+                        else
+                          overlapping_notes << overlapping_beat[:notes][2]
+                        end
+                      else
+                        # The 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the first note
+                        if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
+                          overlapping_notes << overlapping_beat[:notes][0]
+                        elsif current_beat[:rhythm].length == 2 || current_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
+                          # If this is the second note of the two way split or the third of the three way (0.25, 0.25, 0.5) split then we clash with the second AND third of the overlap.
+                          overlapping_notes = overlapping_notes + overlapping_beat[:notes][1..2]
+                        elsif current_beat[:rhythm].length == 3
+                          # If this is the three way split then if corresponds to the equivalent note in the bar.
+                          overlapping_notes << overlapping_beat[:notes][note]
+                        else
+                          # This is the four way split so corresponds to -1 of the index
+                          overlapping_notes << overlapping_beat[:notes][note - 1]
+                        end
+                      end
+                    when 4
+                      # The 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the second note
                       if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
                         overlapping_notes << overlapping_beat[:notes][1]
-                      else
-                        overlapping_notes << overlapping_beat[:notes][2]
-                      end
-                    else
-                      # The 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the first note
-                      if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
-                        overlapping_notes << overlapping_beat[:root_note]
                       elsif current_beat[:rhythm].length == 2 || current_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
-                        # If this is the second note of the two way split or the third of the three way (0.25, 0.25, 0.5) split then we clash with the second AND third of the overlap.
-                        overlapping_notes = overlapping_notes + overlapping_beat[:notes][1..2]
+                        # If this is the second note of the two way split or the third of the three way (0.25, 0.25, 0.5) split then we clash with the third AND fourth of the overlap.
+                        overlapping_notes = overlapping_notes + overlapping_beat[:notes][2..3]
                       elsif current_beat[:rhythm].length == 3
-                        # If this is the three way split then if corresponds to the equivalent note in the bar.
-                        overlapping_notes << overlapping_beat[:notes][note]
+                        # If this is the three way split then if corresponds to the equivalent note in the bar + 1.
+                        overlapping_notes << overlapping_beat[:notes][note + 1]
                       else
-                        # This is the four way split so corresponds to -1 of the index
-                        overlapping_notes << overlapping_beat[:notes][note - 1]
+                        # This is the four way split so corresponds to the equivalent note.
+                        overlapping_notes << overlapping_beat[:notes][note]
                       end
-                    end
-                  when 4
-                    # The 2nd note of the 3 way split (0.25, 0.25, 0.5) and 4 way split, we clash with the second note
-                    if note == 1 && current_beat[:rhythm][0] == Rational(1,4) && current_beat[:rhythm][1] == Rational(1,4)
-                      overlapping_notes << overlapping_beat[:notes][1]
-                    elsif current_beat[:rhythm].length == 2 || current_beat[:rhythm] == [Rational(1,4), Rational(1,4), Rational(1,2)]
-                      # If this is the second note of the two way split or the third of the three way (0.25, 0.25, 0.5) split then we clash with the third AND fourth of the overlap.
-                      overlapping_notes = overlapping_notes + overlapping_beat[:notes][2..3]
-                    elsif current_beat[:rhythm].length == 3
-                      # If this is the three way split then if corresponds to the equivalent note in the bar + 1.
-                      overlapping_notes << overlapping_beat[:notes][note + 1]
-                    else
-                      # This is the four way split so corresponds to the equivalent note.
-                      overlapping_notes << overlapping_beat[:notes][note]
                     end
                   end
                 end
@@ -628,7 +669,7 @@ class Canon
 
       # Run the query.
       q = fresh
-      run(40, q, eq(q, canon_skeleton), *constraints)
+      run(100, q, eq(q, canon_skeleton), *constraints)
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
