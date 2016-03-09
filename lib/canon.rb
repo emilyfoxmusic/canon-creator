@@ -534,7 +534,7 @@ class Canon
         constraints << eq(current_beat[:notes], [n1, n2])
         # Both are the root.
         constraints << eq(n1, current_beat[:root_note])
-        constraints << eq(n2, current_beat[:root_note])
+        constraints << eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1))
       end
 
       # ARGS: The current array of constraints, the MiniKanren variables representing the current beat and the next beat (unless this is the last beat in which case the previous beat) and a boolean specifying whether this is the last beat in the piece.
