@@ -18,14 +18,15 @@ class Exporter
   # ARGS: A canon object and file location string
   # DESCRIPTION: Creates an exporter object, by initiasing the member variables.
   # RETURNS: This exporter object.
-  def initialize(canon, file_loc)
+  def initialize(canon, file_loc, title, composer)
     @canon = canon
     @time_sig = canon.get_metadata.get_time_signature
     @key_sig_note = canon.get_metadata.get_key_note
     @key_sig_type = canon.get_metadata.get_key_type
     @num_voices = canon.get_metadata.get_number_of_voices
-    @clef = "treble"
     @file_loc = file_loc
+    @title = title
+    @composer = composer
     @notes = []
     return self
   end
@@ -439,11 +440,34 @@ class Exporter
     # DESCRIPTION: Find the Lilypond string that represents this canon.
     # RETURNS: The Lilypond string.
     def convert_to_lilypond()
+      # Get the transpositions
+      transpositions = @canon.get_metadata.get_transpositions
       # We need a staff for each voice.
       whole = ""
       for staff in 0..@num_voices - 1
+        # Set the cless and transposition adjustment.
+        if transpositions[staff] < 0
+          clef = "bass"
+        else
+          clef = "treble"
+        end
+        # Get the key note in lilypond representation.
+        lilypond_key_note = convert_key_note_to_lilypond(@key_sig_note)
+        transpose_adjustment = ""
+        case transpositions[staff]
+        when -2
+          transpose_adjustment = ",,"
+        when -1
+          transpose_adjustment = ","
+        when 1
+          transpose_adjustment = "\'"
+        when 2
+          transpose_adjustment = "\'\'"
+        end
+        # Get the instrument name.
+        instrument = @canon.get_metadata.get_sounds[staff].capitalize
         # Add the staff information- clef, time signature, key signature etc..
-        lp = "\\new Staff {\\clef #{ @clef }\n\\time #{ @time_sig }\n\\key #{ convert_key_note_to_lilypond(@key_sig_note) } \\#{ @key_sig_type.to_s }\n"
+        lp = "\\new Staff \\with {\ninstrumentName = \#\"#{ instrument }\"\n}\n{\n\\transpose #{ lilypond_key_note } #{ lilypond_key_note }#{ transpose_adjustment } {\n\\clef #{ clef }\n\\time #{ @time_sig }\n\\key #{ lilypond_key_note } \\#{ @key_sig_type.to_s }\n"
         # Add start rests, staff number * bars per chord progression.
         one_bar_rest = (@time_sig == "3/4") ? "R2." : "R1"
         for bar in 1..(@canon.get_metadata.get_offset * staff)
@@ -457,7 +481,7 @@ class Exporter
         for bar in 1..((@num_voices - 1 - staff) * @canon.get_metadata.get_offset)
           lp = lp + one_bar_rest + " "
         end
-        whole = whole + lp + "}\n"
+        whole = whole + lp + "}\n}\n"
       end
 
       # Return the whole string, wrapped in curly braces.
@@ -468,6 +492,10 @@ class Exporter
     interpret_canon()
     # Open the file specified for writing.
     f = File.open(@file_loc, "w")
+    # Write out the version of Lilypond.
+    f.write("\\version \"2.18.2\"\n\n")
+    # Write out the title of the piece.
+    f.write("\\header {\ntitle = \"#{ @title }\"\ncomposer = \"#{ @composer }\"}\n")
     # Write the lilypond string out to file.
     f.write(convert_to_lilypond())
     # Close the file.
