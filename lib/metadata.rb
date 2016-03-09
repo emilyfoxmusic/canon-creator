@@ -482,15 +482,12 @@ class Metadata
   # RETURNS: Array with transposition of each voice.
   def get_transpositions()
     if @metadata[:voice_octaves] == nil
-      voice_octaves = Array.new(get_number_of_voices)
-      for voice in 0..voice_octaves.length - 1
-        voice_octaves[voice] = [0, 0, 0, -1].choose
-      end
+      voice_octaves = Array.new(get_number_of_voices, 0)
       @metadata[:voice_octaves] = voice_octaves
     elsif @metadata[:voice_octaves].length < get_number_of_voices
       # Append some more until it is the right length.
       for i in 1..(get_number_of_voices - @metadata[:voice_octaves].length)
-        @metadata[:voice_octaves] << [0, 0, 0, -1].choose
+        @metadata[:voice_octaves] << 0
       end
     end
     return @metadata[:voice_octaves]
@@ -504,7 +501,7 @@ class Metadata
     if @metadata[:voices] == nil
       voices = Array.new(get_number_of_voices)
       for voice in 0..voices.length - 1
-        voices[voice] = :choose
+        voices[voice] = [:pretty_bell, :saw, :prophet, :beep].choose
       end
       @metadata[:voices] = voices
     elsif @metadata[:voices].length < get_number_of_voices
