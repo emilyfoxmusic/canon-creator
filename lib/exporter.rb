@@ -14,6 +14,7 @@
 ## export - exports the canon to the lilypond file specified by the file_loc variable.
 
 class Exporter
+  include SonicPi::Lang::Core
 
   # ARGS: A canon object and file location string
   # DESCRIPTION: Creates an exporter object, by initiasing the member variables.

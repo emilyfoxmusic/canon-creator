@@ -34,6 +34,7 @@
 # (G) get_offset
 
 class Metadata
+  include SonicPi::Lang::Core
 
   # ARGS: None.
   # DESCRIPTION: Makes a new Metadata object, with a empty information.

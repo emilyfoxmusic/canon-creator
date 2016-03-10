@@ -14,6 +14,7 @@
 require "mini_kanren"
 
 class Canon
+  include SonicPi::Lang::Core
 
   # ARGS: A metadata object with canon properties.
   # DESCRIPTION: Automatically generates the whole canon to populate the other member variables of this object.
