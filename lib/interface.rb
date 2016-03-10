@@ -83,14 +83,21 @@ define :canon_play do |canon_arg|
       sleep offset
     end
   end
+  return canon
 end
 
 # ARGS: Canon metadata object, file location to export to, and whether to play the canon or not.
 # DESCRIPTION: Creates a canon from the metadata, exports it to file and then if the third argument is true, plays it.
 # RETURNS: Nil.
-define :canon_export do |metadata, file_loc, composer="Canon Creator", title="A Brave New Canon", play=true, bpm=nil|
-  # Generate the canon from the metadata.
-  canon = Canon.new(metadata)
+define :canon_export do |canon_arg, file_loc, composer="Canon Creator", title="A Brave New Canon", play=true, bpm=nil|
+  # If the argument is metadata, generate a canon from it.
+  if canon_arg.is_a?(Metadata)
+    canon = Canon.new(canon_arg)
+  elsif canon_arg.is_a?(Canon)
+    canon = canon_arg
+  else
+    raise "Wrong argument type for canon_export: #{ canon_arg.class }."
+  end
   # Create a new exporter object for this canon with the file location specified.
   exporter = Exporter.new(canon, file_loc, title, composer, bpm)
   # Export the canon.
