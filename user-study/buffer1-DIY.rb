@@ -3,14 +3,15 @@
 ##########################################
 
 # This is where you create your canon manually. You have been provided with a template to modify
-#    as you wish.
+# as you wish.
 
 ##########################################
 ###### INFORMATION ABOUT YOUR CANON ######
 ##########################################
 
 # This is the number of beats to wait before starting to play the melody again.
-number_of_beats_between_voices = 4
+number_of_beats_per_bar = 4
+number_of_bars_before_starting_the_next_voice = 1
 
 # This is how many times you want the melody to play (how many parts/voices in the canon).
 number_of_voices = 3
@@ -21,7 +22,7 @@ sounds = [:pretty_bell, :saw, :tb303]
 
 # This is the transpose you want to apply to each voice, in semitones. To have them all the same, just
 # write zero in each. To put it up an octave use 12, down an octave use -12, up two octaves use 24 etc.
-transpose = [0, 0, -12]
+transpose = [0, 0, -1]
 
 ##########################################
 ############## YOUR CANON! ###############
@@ -52,5 +53,5 @@ canon = [
 
 # Do NOT touch this part.
 
-validate_canon(canon)
-play_user_canon(canon, number_of_beats_between_voices, number_of_voices, sounds, transpose)
+validate_canon(canon, number_of_beats_per_bar, number_of_bars_before_starting_the_next_voice)
+play_user_canon(canon, number_of_beats_per_bar, number_of_bars_before_starting_the_next_voice, number_of_voices, sounds, transpose)
