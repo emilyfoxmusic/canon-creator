@@ -53,5 +53,5 @@ canon = [
 
 # Do NOT touch this part.
 
-validate_canon(canon, number_of_beats_per_bar, number_of_bars_before_starting_the_next_voice)
+validate_canon(canon, number_of_beats_per_bar, number_of_bars_before_starting_the_next_voice, number_of_voices, sounds, transpose)
 play_user_canon(canon, number_of_beats_per_bar, number_of_bars_before_starting_the_next_voice, number_of_voices, sounds, transpose)

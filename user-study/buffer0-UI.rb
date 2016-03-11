@@ -7,7 +7,27 @@
 ## DIY Creator
 
 # Check that the user's canon is ok to play.
-define :validate_canon do |canon, beats_per_bar, offset|
+define :validate_canon do |canon, beats_per_bar, offset, number_of_voices, sounds, transpose|
+  # Check that offset and number of voices are positive.
+  if offset < 1
+    raise "Number of bars between voices must be at least one."
+  end
+  if number_of_voices < 1
+    raise "Number of voices must be at least one."
+  end
+  # Check that the transpose and sounds are the right length.
+  if !transpose.length == number_of_voices
+    raise "The transpose array is not the right length- you need one per voice."
+  end
+  if !sounds.length == number_of_voices
+    raise "The sounds array is not the right length- you need one per voice."
+  end
+  # Check that all transposes are between -2 and 2.
+  transpose.map do |transpose|
+    if ![-2, -1, 0, 1, 2].include?(transpose)
+      raise "You may only transpose by -2, -1, 0, 1, or 2 octaves, not #{ transpose }."
+    end
+  end
   # Check that the beats per bar is 3 or 4.
   if ![3, 4].include?(beats_per_bar)
     raise "There must be 3 or 4 beats in a bar, not #{ beats_per_bar }."

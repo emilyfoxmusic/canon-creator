@@ -360,13 +360,13 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Get the lowest note. Default to 2 octaves below the highest note, or else to the tonic of the default octave.
+  # DESCRIPTION: Get the lowest note. Default to 2 octaves below the highest note, or else to :c4.
   # RETURNS: The lowest note (name).
   def get_lowest_note()
     if @metadata[:lowest_note] == nil
       if @metadata[:highest_note] == nil
-        # If neither are set, make the lowest note the key note.
-        self.lowest_note(get_key_note)
+        # If neither are set, make the lowest note :c4.
+        self.lowest_note(:c4)
       else
         # Set the lowest note to be two octaves below the highest note.
         self.lowest_note(get_note_at_offset(get_highest_note, -2))
@@ -377,13 +377,13 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Get the highest note allowed. Default to 2 octaves above the lowest note, or else to the tonic 2 octaves above the default octave.
+  # DESCRIPTION: Get the highest note allowed. Default to 2 octaves above the lowest note, or else to the :c6.
   # RETURNS: This highest note (name).
   def get_highest_note()
     if @metadata[:highest_note] == nil
       if @metadata[:lowest_note] == nil
         # If neither are set, make the highest note the tonic two octaves higher than the given key note.
-        self.highest_note(get_note_at_offset(get_key_note, 2))
+        self.highest_note(:c6)
       else
         # Set the highest note to be two octaves above the lowest note.
         self.highest_note(get_note_at_offset(get_lowest_note, 2))
@@ -446,11 +446,11 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the type of the canon. Choose one at random if not specified.
+  # DESCRIPTION: Return the type of the canon. Choose :round if not specified.
   # RETURNS: Canon type.
   def get_type()
     if @metadata[:type] == nil
-      @metadata[:type] = [:round, :crab, :palindrome].choose
+      @metadata[:type] = :round
     end
     return @metadata[:type]
   end
