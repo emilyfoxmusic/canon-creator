@@ -20,8 +20,8 @@ number_of_voices = 3
 # **Make sure you type it correctly or it will be silent!**
 sounds = [:pretty_bell, :saw, :tb303]
 
-# This is the transpose you want to apply to each voice, in semitones. To have them all the same, just
-# write zero in each. To put it up an octave use 12, down an octave use -12, up two octaves use 24 etc.
+# This is the transpose you want to apply to each voice, in octaves. To have them all the same, just
+# write zero in each. To put it up an octave use 1, down an octave use -1, up two octaves use 2 etc.
 transpose = [0, 0, -1]
 
 # This is the tempo (speed) of the piece, in beats per minute.
@@ -34,7 +34,7 @@ tempo = 70
 use_bpm tempo
 
 # This is your canon. The whole piece goes inside square brackets ([]) and each note goes inside
-# curly brakets ({}). Each note needs a pitch and a length and separate each note with a
+# curly brackets ({}). Each note needs a pitch and a length and separate each note with a
 # comma. e.g. [{pitch: :c, length: 1}, {pitch: :d, length: 0.5}]
 
 canon = [
