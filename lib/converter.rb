@@ -52,13 +52,36 @@ class Converter
         length = 4
       end
       # Find the adjustment string for it.
-      adjustment_string = get_adjustment_string(pi_note[1])
-      return pi_note[0] + adjustment_string + length.to_s
+      if pi_note.length == 2
+        if pi_note[1] == "s"
+          note_name = pi_note[0] + "is"
+          octave = 4
+        elsif pi_note[1] == "b"
+          note_name = pi_note[0] + "es"
+          octave = 4
+        else
+          note_name = pi_note[0]
+          octave = pi_note[1].to_i
+        end
+      elsif pi_note.length == 3
+        note_name = pi_note[0..1]
+        if note_name[1] == "s"
+          note_name = note_name[0] + "is"
+        else
+          note_name = note_name[0] + "es"
+        end
+        octave = pi_note[2].to_i
+      else
+        note_name = pi_note[0]
+        octave = 4
+      end
+      adjustment_string = get_adjustment_string(octave)
+      return note_name + adjustment_string + length.to_s
     end
 
     # Find the representation of a bar rest.
     bar_rest = nil
-    if @beats_in_bar = 3
+    if @beats_in_bar == 3
       bar_rest = "R2."
     else
       bar_rest = "R1"
