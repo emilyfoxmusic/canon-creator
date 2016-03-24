@@ -1,8 +1,13 @@
-# This file is just to take in one of the hardcoded canons and turn it into a canon in the canon-creator Canon class representation so that it can be exported to lilypond.
-# WE ASSUME THAT ALL PIECES ARE WRITTEN IN C.
+# Copyright (c) 2015 Emily Fox, MIT License.
+# Full code available at https://github.com/EJCFox/canon-creator/
+
+# CLASS DECRIPTION: A Converter object takes in one of the hardcoded canons (developed for the user study) and exports it to Lilypond. WE ASSUME THAT ALL PIECES ARE WRITTEN IN C.
 
 class Converter
 
+  # ARGS: The canon, the number of beats per bar, the number of voices, the tempo, instruments to be used, transpositions to be used, where to save the file to, the title and the composer.
+  # DESCRIPTION: Initialises the converter object and exports the music.
+  # RETURNS: Nil.
   def initialize(canon, beats_in_bar, num_voices, tempo, instruments, transpose, file_loc, title, composer)
     @canon = canon
     @beats_in_bar = beats_in_bar
@@ -16,6 +21,9 @@ class Converter
     export()
   end
 
+  # ARGS: None.
+  # DESCRIPTION: Exports the canon to Lilypond.
+  # RETURNS: Nil.
   def export()
 
     # ARGS: The octave number.
@@ -41,8 +49,12 @@ class Converter
       return octave_string
     end
 
+    # ARGS: The note in Sonic Pi's string representation and the length of the note (0.25, 0.5 or 1).
+    # DESCRIPTION: Gets the Lilypond representation of the note.
+    # RETURNS: The Lilypond note.
     def get_note(pi_note, length)
       pi_note = pi_note.to_s
+      # Deal with the lilypond lengths.
       case length
       when 0.25
         length = 16
@@ -76,17 +88,17 @@ class Converter
         octave = 4
       end
       adjustment_string = get_adjustment_string(octave)
+      # Return the concatenated string.
       return note_name + adjustment_string + length.to_s
     end
 
-    # Find the representation of a bar rest.
+    # Find the representation of a bar rest (depends on time signature).
     bar_rest = nil
     if @beats_in_bar == 3
       bar_rest = "R2."
     else
       bar_rest = "R1"
     end
-
     # Open the file specified for writing.
     f = File.open(@file_loc, "w")
     # Write out the version of Lilypond.
