@@ -7,9 +7,12 @@
 ## time_sig (String) - the time signature of the canon.
 ## key_sig_note (immutable String) - the tonic of the piece.
 ## key_sig_type (immutable String) - the type of scale used for this canon.
-## clef (String) - the clef used in this export.
+## num_voices (integer) - the number of voices in the piece.
 ## file_loc (String) - the file name to export to.
-## note (array of Strings) - the Lilypond notes.
+## title (String) - the title of the piece.
+## composer (String) - the composer of the piece.
+## bpm (integer) - the tempo of the piece, in beats per minute.
+## notes (array of Strings) - the Lilypond notes.
 # INTERFACE METHODS
 ## export - exports the canon to the lilypond file specified by the file_loc variable.
 
@@ -490,7 +493,6 @@ class Exporter
         end
         whole = whole + lp + "}\n}\n"
       end
-
       # Return the whole string, wrapped in curly braces.
       return "{\n<<\n" + whole + "\n>>\n}"
     end

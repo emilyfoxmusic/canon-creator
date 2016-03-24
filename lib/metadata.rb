@@ -14,10 +14,11 @@
 # (S) probabilities
 # (S) number_of_bars
 # (S) number_of_voices
-# (S) voice_offset
 # (S) type
 # (S) variation
+# (S) voice_offset
 # (S) voice_transpositions
+# (S) sounds
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -29,9 +30,10 @@
 # (G) get_number_of_bars
 # (G) get_number_of_voices
 # (G) get_type
-# (G) get_variations
-# (G) get_voice_octaves
+# (G) get_variation
 # (G) get_offset
+# (G) get_transpositions
+# (G) get_sounds
 
 class Metadata
   include SonicPi::Lang::Core
@@ -109,8 +111,9 @@ class Metadata
   # DESCRIPTION: Set the time signature. Only 3 and 4 are supported.
   # RETURNS: This Metadata object.
   def beats_per_bar(time_sig)
-    # Specify valid time signatures.
+    # Specify valid beats per bar.
     valid_beats = [3, 4]
+    # Check the given beat number is valid.
     if valid_beats.include?(time_sig)
       if time_sig == 3
         @metadata[:time_sig] = "3/4"
@@ -202,6 +205,7 @@ class Metadata
   # DESCRIPTION: Sets the number of bars in the piece. There is a maximum of 50 and a minimum of 2.
   # RETURNS: This Metadata object.
   def number_of_bars(n)
+    # Check that the number is in the correct range.
     if n > 1 && n <= 50
       @metadata[:number_of_bars] = n
     else
@@ -215,6 +219,7 @@ class Metadata
   # DESCRIPTION: Sets the number of voices for this piece. Must be between 1 and 4.
   # RETURNS: This Metadata object.
   def number_of_voices(n)
+    # Check the number of voices is valid.
     if [1, 2, 3, 4].include?(n)
       @metadata[:number_of_voices] = n
     else
@@ -228,6 +233,7 @@ class Metadata
   # DESCRIPTION: Sets the type of canon.
   # RETURNS: This Metadata object.
   def type(type)
+    # Check that the type given is valid.
     if [:crab, :round, :palindrome].include?(type)
       @metadata[:type] = type
     else
@@ -241,6 +247,7 @@ class Metadata
   # DESCRIPTION: Sets the number of tune variations to generate, as a percentage of the piece length (between 1 and 100).
   # RETURNS: This Metadata object.
   def variation(number)
+    # Check the variation is a valid percentage.
     if 0 < number && number <= 100
       @metadata[:variations] = number
     else
@@ -254,6 +261,7 @@ class Metadata
   # DESCRIPTION: Sets the number of bars before the next voice comes in. Must be between 1 and 4.
   # RETURNS: This Metadata object.
   def voice_offset(number)
+    # Check that the offset is valid.
     if [1, 2, 3, 4].include?(number)
       @metadata[:bars_per_chord_prog] = number
     else
@@ -267,6 +275,7 @@ class Metadata
   # DESCRIPTION: Sets the transposition of the voices.
   # RETURNS: This Metadata object.
   def voice_transpositions(transposition)
+    # Check that the transpositions are valid.
     transposition.map do |transposition|
       if ![0, 1, -1, 2, -2].include?(transposition)
         raise "Invalid transposition: #{ transposition }. Only -2, -1, 0, 1 and 2 are valid."
@@ -281,6 +290,7 @@ class Metadata
   # DESCRIPTION: Sets the voice type of the parts.
   # RETURNS: This Metadata object.
   def sounds(sounds)
+    # Check that the sounds value is given as an array.
     if !sounds.is_a?(Array)
       raise "Invalid sounds: #{ sounds }. It must be an array of synth types."
     end
@@ -397,6 +407,7 @@ class Metadata
   # DESCRIPTION: Get the maximum jump allowed. Default to 6.
   # RETURNS: The maximum jump.
   def get_max_jump()
+    # If there is no value set at the moment, set it to 6.
     if @metadata[:max_jump] == nil
       self.max_jump(6)
     end
@@ -413,9 +424,10 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the probabilities of transforming each beat into each number of notes. Default to 0.35, 0.3, 0.3, 0.05.
+  # DESCRIPTION: Return the probabilities of transforming each beat into each number of notes. Default to [0.5, 0.25, 0.15, 0.1].
   # RETURNS: Array of probabilities.
   def get_probabilities()
+    # If there is no value set at the moment, set it to [0.5, 0.25, 0.15, 0.1].
     if @metadata[:probabilities] == nil
       self.probabilities([0.5, 0.25, 0.15, 0.1])
     end
@@ -427,6 +439,7 @@ class Metadata
   # DESCRIPTION: Return the number of bars in the piece. Default to 2 times the number of beats in a bar.
   # RETURNS: Number of bars.
   def get_number_of_bars()
+    # If there is no value set yet, make it 2 * beats per bar.
     if @metadata[:number_of_bars] == nil
       @metadata[:number_of_bars] = 2 * get_beats_in_bar
     end
@@ -435,9 +448,10 @@ class Metadata
 
   ## GETTER
   # ARGS: None.
-  # DESCRIPTION: Return the number of voices in the piece. Default to the number of beats in a bar.
+  # DESCRIPTION: Return the number of voices in the piece. Default to 2.
   # RETURNS: Number of voices.
   def get_number_of_voices()
+    # If there is no number of voices set, set it to 2.
     if @metadata[:number_of_voices] == nil
       @metadata[:number_of_voices] = 2
     end
@@ -449,6 +463,7 @@ class Metadata
   # DESCRIPTION: Return the type of the canon. Choose :round if not specified.
   # RETURNS: Canon type.
   def get_type()
+    # Check if a type has been specified and if not set it to :round.
     if @metadata[:type] == nil
       @metadata[:type] = :round
     end
@@ -460,6 +475,7 @@ class Metadata
   # DESCRIPTION: Return the Number of variations to generate. If none, choose between 50 and 100.
   # RETURNS: number of variations.
   def get_variation()
+    # Check if a value has been chosen and if not, choose 50 or 100.
     if @metadata[:variations] == nil
       @metadata[:variations] = [50, 100].choose
     end
@@ -471,6 +487,7 @@ class Metadata
   # DESCRIPTION: Return the Number of bars per chord progression. If none given, choose a random number between 1 and 4.
   # RETURNS: number of variations.
   def get_offset()
+    # Check if an offset has been given. If not set it to 1 or 2.
     if @metadata[:bars_per_chord_prog] == nil
       @metadata[:bars_per_chord_prog] = [1, 2].choose
     end
@@ -482,11 +499,13 @@ class Metadata
   # DESCRIPTION: Return the transposition of each voice.
   # RETURNS: Array with transposition of each voice.
   def get_transpositions()
+    # Check if a value has been given already.
     if @metadata[:voice_octaves] == nil
+      # If no, set all to 0.
       voice_octaves = Array.new(get_number_of_voices, 0)
       @metadata[:voice_octaves] = voice_octaves
     elsif @metadata[:voice_octaves].length < get_number_of_voices
-      # Append some more until it is the right length.
+      # If yes but not enough, append some more until there are enough for the number of voices.
       for i in 1..(get_number_of_voices - @metadata[:voice_octaves].length)
         @metadata[:voice_octaves] << 0
       end
@@ -499,14 +518,16 @@ class Metadata
   # DESCRIPTION: Return the sound for each voice.
   # RETURNS: Array of voices.
   def get_sounds()
+    # Check if sounds have been specified.
     if @metadata[:voices] == nil
+      # If not then choose the voices at random.
       voices = Array.new(get_number_of_voices)
       for voice in 0..voices.length - 1
         voices[voice] = [:pretty_bell, :saw, :prophet, :beep].choose
       end
       @metadata[:voices] = voices
     elsif @metadata[:voices].length < get_number_of_voices
-      # Append some more until it is the right length.
+      # If yes but not enough, append some more until it there are enough for the number of voices.
       for i in 1..(get_number_of_voices - @metadata[:voices].length)
         @metadata[:voices] << [:pretty_bell, :saw, :prophet, :beep].choose
       end

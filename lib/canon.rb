@@ -50,18 +50,6 @@ class Canon
     return @canon_complete
   end
 
-  def get_chord_prog
-    return @chord_progression
-  end
-
-  def get_variations
-    return @variations
-  end
-
-  def get_skeleton
-    return @canon_skeleton
-  end
-
   # ARGS: None.
   # DESCRIPTION: Populates the concrete scale by finding all notes in the scale between the highest and lowest notes allowed. Generates randomly other metadata that it doesn't already have.
   # RETURNS: Nil.
@@ -93,7 +81,7 @@ class Canon
   def generate_chord_progression()
     # Create a new array with a chord for each beat, with the number of beats dictated by the metadata.
     @chord_progression = Array.new(@metadata.get_beats_in_bar * @metadata.get_offset)
-    # State which chords are available
+    # State which chords are available.
     chord_choice = [:I, :IV, :V, :VI]
     if @metadata.get_type == :round
       # Choose each chord at random except the last two which are always V-I (perfect cadence).
@@ -124,7 +112,9 @@ class Canon
   # RETURNS: Nil.
   def generate_variations()
     @variations = []
+    # Use the percentage given by the value in the metadata.
     number_of_variations = (@metadata.get_number_of_bars * (@metadata.get_variation / 100.0)).ceil
+    # Generate the actual variations.
     for variation in 0..number_of_variations - 1
       this_variation = []
       for beat in 0..@metadata.get_beats_in_bar - 1
@@ -161,7 +151,7 @@ class Canon
       # DESCRIPTION: This method adds constraints on the current beat to constrain it to:
       # 1) A note in the scale given (tonic option included)
       # 2) A note not exceeding max_jump distance from the next
-      # 3) Not the same note as in other variations in the same position
+      # 3) Not the same note as in overlapping beats
       # It fails if no such unification exists.
       # RETURNS: The project constraint which contains all this information.
       def constrain_to_possible_notes(current_beat_var, next_beat_var, chord_name, unavailable_notes)
@@ -176,10 +166,10 @@ class Canon
         end
         # If this is the last beat, then there is no next beat.
         if next_beat_var == nil
-          # Return the project function, with the next beat and unavailable notes projected.
+          # Return the project function with the unavailable notes projected.
           return project(unavailable_notes, lambda do |unavailable_notes|
             refined_possibilities = possible_notes
-            # Keep only those not too far from the next beat, not the same as the next and not the same as one of the unavailable notes.
+            # Keep only those not too far from the next beat and not the same as one of the unavailable notes.
             refined_possibilities = possible_notes.select do |note|
               !unavailable_notes.include?(note)
             end
@@ -407,7 +397,7 @@ class Canon
     end
     # Choose one to be this canon's structure
     if canon_structure_options.empty?
-      raise "No canons available for these settings. Try increasing the range of the piece."
+      raise "No canons available for these settings. Try increasing the range of the piece or increasing max_jump."
     else
       @canon_skeleton = canon_structure_options.choose
     end
@@ -435,6 +425,9 @@ class Canon
       @chord_progression = chord_progression
       @variation_counter = 0
 
+      # ARGS: None.
+      # DESCRIPTION: Gets the next variation to be used.
+      # RETURNS: An array of uniform RVs between 0 and 1 assosicated with this variation.
       def get_next_variation
         number_of_variations = (@metadata.get_number_of_bars * (@metadata.get_variation / 100.0)).ceil
         this_variation = @variations[@variation_counter]
@@ -476,6 +469,7 @@ class Canon
               note2_index = note2_index + 1
             end
           end
+          # Choose n from the possible notes and sort them (ascending).
           note_walk = choose_n(@concrete_scale[note1_index..note2_index], number_of_steps).sort
         else
           # Extend the note1 range by 2 if possible.
@@ -490,6 +484,7 @@ class Canon
               note1_index = note1_index + 1
             end
           end
+          # Choose n from the possible notes and sort them (descending).
           note_walk = choose_n(@concrete_scale[note2_index..note1_index], number_of_steps).sort.reverse
         end
         return note_walk
@@ -502,7 +497,7 @@ class Canon
         # Get the probabilities.
         probabilities = @metadata.get_probabilities
         # Choose which transform to use.
-        if is_last_note || fate < probabilities[0]
+        if is_last_note || fate < probabilities[0] # THE LAST BEAT *MUST* BE A SINGLE TRANSFORM FOR THE ALGORITHM TO WORK.
           # Single transform.
           transform_beat_single(constraints, current_beat)
         elsif fate < probabilities[0] + probabilities[1]
@@ -550,7 +545,7 @@ class Canon
         conde_options = [
           eq(current_beat[:rhythm], [Rational(1,4), Rational(1,4), Rational(1,2)]),
           eq(current_beat[:rhythm], [Rational(1,2), Rational(1,4), Rational(1,4)])
-          #eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)])
+          #eq(current_beat[:rhythm], [Rational(1,3), Rational(1,3), Rational(1,3)]) # Disable triplets because it leads to pieces that are not very musical.
         ]
         constraints << conde(*conde_options.shuffle)
         # Constrain the pitch.
@@ -558,7 +553,7 @@ class Canon
         n1, n2, n3 = fresh(3)
         # Unify this beat's pitch with the three notes.
         constraints << eq(current_beat[:notes], [n1, n2, n3])
-        # The first note is the root and the second two walk to the next root note.
+        # The first and third notes are the root and the second walks to the next root note.
         constraints << eq(n1, current_beat[:root_note])
         constraints << eq([n2], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 1))
         constraints << eq(n3, current_beat[:root_note])
@@ -575,26 +570,35 @@ class Canon
         n1, n2, n3, n4 = fresh(4)
         # Unify this beat's pitch with the four notes.
         constraints << eq(current_beat[:notes], [n1, n2, n3, n4])
-        # The first note is the root and the second two walk to the next root note.
+        # The first and third notes are the root note and the second and fourth walk to the next root note.
         constraints << eq(n1, current_beat[:root_note])
         constraints << eq([n2, n4], find_walking_notes(current_beat[:root_note], other_beat[:root_note], 2))
         constraints << eq(n3, current_beat[:root_note])
       end
 
+      # ARGS: The current array of constraints, the canon so far, the beat and bar numbers to be transformed.
+      # DESCRIPTION: Carries out the transform on a beat by calling the method with the right other beat and with the correct decision on whether this is the last beat.
+      # RETURNS: Nil.
       def transform_beat_intelligent(constraints, canon, variation, bar, beat)
         other_beat = nil
         is_last_note = false
-        if beat < @metadata.get_beats_in_bar - 1 # If the next beat is in this bar, constrain using next beat.
+        if beat < @metadata.get_beats_in_bar - 1
+          # If the next beat is in this bar, constrain using next beat.
           other_beat = canon[bar][beat + 1]
-        elsif bar < (@chord_progression.length / @metadata.get_beats_in_bar) - 1 # Else, if it's in the next, constrain using that beat.
+        elsif bar < (@chord_progression.length / @metadata.get_beats_in_bar) - 1
+          # Else, if it's in the next, constrain using that beat.
           other_beat = canon[bar + 1][0]
-        else # Else, if there is no next beat (last in variation) then transform with previous beat.
+        else
+          # Else, if there is no next beat (last in variation) then transform with previous beat.
           other_beat = canon[bar][beat - 1]
           is_last_note = true
         end
         transform_beat(constraints, canon[bar][beat], other_beat, is_last_note, variation[beat])
       end
 
+      # ARGS: The beat that is going to be mirrored and the beat to mirror it onto.
+      # DESCRIPTION: Makes the constraint that the mirror beat is a mirrored version of the ground beat. (The ground beat MUST have a substitution in the current environment.)
+      # RETURNS: A project constraint that encodes the above.
       def are_mirrored(mirror_beat, ground_beat)
         return project(ground_beat, lambda do |ground_beat|
           all(

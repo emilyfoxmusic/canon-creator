@@ -89,7 +89,7 @@ end
 # ARGS: Canon metadata object, file location to export to, and whether to play the canon or not.
 # DESCRIPTION: Creates a canon from the metadata, exports it to file and then if the third argument is true, plays it.
 # RETURNS: Nil.
-define :canon_export do |canon_arg, file_loc, composer="Canon Creator", title="A Brave New Canon", play=true, bpm=nil|
+define :canon_export do |canon_arg, file_loc, title="Untitled", composer="Anon.", play=true, bpm=nil|
   # If the argument is metadata, generate a canon from it.
   if canon_arg.is_a?(Metadata)
     canon = Canon.new(canon_arg)
