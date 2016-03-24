@@ -375,21 +375,22 @@ class Canon
         # ASSERT: the last half is unified, excluding middle bar if there's an odd number of bars.
         # If there's an odd number of bars, deal with the middle one.
         if (@metadata.get_number_of_bars % 2 == 1)
-          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
-            add_constraints(constraints, canon_skeleton,bar, beat)
+          bar = @metadata.get_number_of_bars / 2
+          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar) / 2) do |beat|
+            add_constraints(constraints, canon_skeleton, bar, beat)
           end
         end
         # ASSERT: half the canon is unified.
         # Mirror the canon for the first half.
         # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
         if (@metadata.get_number_of_bars % 2 == 1)
+          bar = @metadata.get_number_of_bars / 2
           ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
-            mirrored_bar = @metadata.get_number_of_bars - bar - 1
             mirrored_beat = @metadata.get_beats_in_bar - beat - 1
-            constraints << eq(canon_skeleton[bar][bar][:root_note], canon_skeleton[mirrored_bar][mirrored_beat][:root_note])
+            constraints << eq(canon_skeleton[bar][beat][:root_note], canon_skeleton[bar][mirrored_beat][:root_note])
           end
         end
-        # The first half mirrors the second half.
+        # The first half mirrors the second half. Exclude central if odd number of bars.
         for bar in 0..((@metadata.get_number_of_bars - 2) / 2)
           for beat in 0..(@metadata.get_beats_in_bar - 1)
             mirrored_bar = @metadata.get_number_of_bars - bar - 1
@@ -662,7 +663,8 @@ class Canon
         # If there's an odd number of bars, deal with the middle one.
         if (@metadata.get_number_of_bars % 2 == 1)
           variation = get_next_variation
-          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar - 1) / 2) do |beat|
+          bar = @metadata.get_number_of_bars / 2
+          (@metadata.get_beats_in_bar - 1).downto((@metadata.get_beats_in_bar) / 2) do |beat|
             transform_beat_intelligent(constraints, canon, variation, bar, beat)
           end
         end
@@ -670,10 +672,10 @@ class Canon
         # Mirror the canon for the first half.
         # If there's an odd number of bars, constrain half the middle bar to mirror the other half.
         if (@metadata.get_number_of_bars % 2 == 1)
+          bar = @metadata.get_number_of_bars / 2
           ((@metadata.get_beats_in_bar - 2) / 2).downto(0) do |beat|
-            mirrored_bar = @metadata.get_number_of_bars - bar - 1
             mirrored_beat = @metadata.get_beats_in_bar - beat - 1
-            constraints << are_mirrored(canon[bar][beat], canon[mirrored_bar][mirrored_beat])
+            constraints << are_mirrored(canon[bar][beat], canon[bar][mirrored_beat])
           end
         end
         # The first half mirrors the second half.
