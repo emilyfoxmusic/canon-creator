@@ -1,8 +1,8 @@
 \version "2.18.2"
 
 \header {
-title = "An Untitled Canon."
-composer = "Anon."}
+title = "Untitled"
+composer = "03"}
 {
 <<
 \new Staff \with {
