@@ -10,7 +10,10 @@ Canon Creator is some code that you can use within Sonic Pi (https://github.com/
 See https://en.wikipedia.org/wiki/Canon_%28music%29 for detailed information about canons. Currently this software only supports the creation of rounds, palindromes and a form of crab canons, which are specialist types of canon.
 
 ### Installation
-Copy the canon-creator folder into the vendor file of your Sonic Pi installation (*sonic-pi/app/server/vendor/*). When you want to use the functionality you will have to copy and paste the contents of the *interface.rb* file into a workspace within Sonic Pi and run it. (You must do this every time you start Sonic Pi.) Then you are able to use it wherever you want within that session.
+
+You will need to copy both MiniKanren and Canon Creator into the vendor folder of your Sonic Pi installation (*sonic-pi/app/server/vendor/*). Go to https://github.com/spariev/mini_kanren to get MiniKanren, and get Canon Creator from this repository.
+
+When you want to use the Canon Creator functionality you will have to copy and paste the contents of the *interface.rb* file into a workspace within Sonic Pi and run it. (You must do this every time you start Sonic Pi.) Then you are able to use it wherever you want within that session.
 
 ### Use
 Canons may be created using the function canon(). You may then chain options to constrain what canons will be generated. A complete list of options is given below.
