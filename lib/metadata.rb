@@ -19,6 +19,7 @@
 # (S) voice_offset
 # (S) voice_transpositions
 # (S) sounds
+# (S) repeats
 # (G) get_key_note
 # (G) get_key_type
 # (G) get_time_signature
@@ -34,6 +35,7 @@
 # (G) get_offset
 # (G) get_transpositions
 # (G) get_sounds
+# (G) get_repeats
 
 class Metadata
   include SonicPi::Lang::Core
@@ -298,6 +300,20 @@ class Metadata
     return self
   end
 
+  ## SETTER
+  # ARGS: Number of repeats to do.
+  # DESCRIPTION: Sets the number of repeats in the piece. There is a maximum of 50 and a minimum of 1.
+  # RETURNS: This Metadata object.
+  def repeats(n)
+    # Check that the number is in the correct range.
+    if n > 0 && n <= 50
+      @metadata[:repeats] = n
+    else
+      raise "The number of repeats must be between 1 and 50."
+    end
+    return self
+  end
+
   ## NB: There is an assumption that these will only be called by the canon class- so things are not generated ranomly until they are linked with a canon. These should NOT be used in setters!
 
   ## GETTER
@@ -533,6 +549,18 @@ class Metadata
       end
     end
     return @metadata[:voices]
+  end
+
+  ## GETTER
+  # ARGS: None.
+  # DESCRIPTION: Get the number of repeats. Default to 1.
+  # RETURNS: The number of repeats.
+  def get_repeats()
+    # If there is no value set at the moment, set it to 1.
+    if @metadata[:repeats] == nil
+      self.repeats(1)
+    end
+    return @metadata[:repeats]
   end
 
 end

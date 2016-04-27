@@ -33,6 +33,15 @@ class Exporter
     @composer = composer
     @bpm = bpm
     @notes = []
+    @canon_internal_rep = nil
+
+    # Find the number of repeats, and make the canon repeat itself that many times.
+    repeats = canon.get_metadata.get_repeats
+    @canon_internal_rep = Array.new(repeats * canon.get_metadata.get_number_of_bars)
+    for index in 0..@canon_internal_rep.length - 1
+      @canon_internal_rep[index] = canon.get_canon_as_array[index % canon.get_metadata.get_number_of_bars]
+    end
+
     return self
   end
 
@@ -370,8 +379,8 @@ class Exporter
     # DESCRIPTION: Interprets each bar in turn.
     # RETURNS: Nil.
     def interpret_canon()
-      for i in 0..@canon.get_canon_as_array.length - 1
-        add_bar(@canon.get_canon_as_array[i])
+      for i in 0..@canon_internal_rep.length - 1
+        add_bar(@canon_internal_rep[i])
       end
     end
 

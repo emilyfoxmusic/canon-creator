@@ -70,17 +70,26 @@ define :canon_play do |canon_arg|
   else
     # Find how many voices to play- this is the same as beats in a bar.
     num_voices = canon.get_metadata.get_number_of_voices
+    num_repeats = canon.get_metadata.get_repeats
     offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_offset
     voices = canon.get_metadata.get_sounds
     transpositions = canon.get_metadata.get_transpositions
     # Play the melody the correct number of times at the different offsets.
     for voice in 0..num_voices - 1
       in_thread do
-        # Start this voice with a random pan value.
-        play_melody(canon_internal_rep, rand * 0.75, voices[voice], transpositions[voice])
+        pan = rand * 0.75
+        this_voice = voice
+        for repeat in 0..num_repeats - 1
+          # Start this voice with a random pan value.
+          play_melody(canon_internal_rep, pan, voices[this_voice], transpositions[this_voice])
+        end
       end
-      # Sleep until the next bar.
-      sleep offset
+      # Sleep until the next voice comes in, unless it is the last voice in which case sleep until the end.
+      if voice == num_voices - 1
+        sleep canon.get_metadata.get_number_of_bars * canon.get_metadata.get_beats_in_bar * num_repeats
+      else
+        sleep offset
+      end
     end
   end
   return canon
