@@ -33,15 +33,7 @@ class Exporter
     @composer = composer
     @bpm = bpm
     @notes = []
-    @canon_internal_rep = nil
-
-    # Find the number of repeats, and make the canon repeat itself that many times.
-    repeats = canon.get_metadata.get_repeats
-    @canon_internal_rep = Array.new(repeats * canon.get_metadata.get_number_of_bars)
-    for index in 0..@canon_internal_rep.length - 1
-      @canon_internal_rep[index] = canon.get_canon_as_array[index % canon.get_metadata.get_number_of_bars]
-    end
-
+    @canon_internal_rep = canon.get_canon_as_array
     return self
   end
 
@@ -486,22 +478,36 @@ class Exporter
           tempo_string = "\\tempo 4 = #{ @bpm }\n"
         end
         # Add the staff information- clef, time signature, key signature etc..
-        lp = "\\new Staff \\with {\ninstrumentName = \#\"#{ instrument }\"\n}\n{\n#{ tempo_string }\\transpose #{ lilypond_key_note } #{ lilypond_key_note }#{ transpose_adjustment } {\n\\clef #{ clef }\n\\time #{ @time_sig }\n\\key #{ lilypond_key_note } \\#{ @key_sig_type.to_s }\n"
+        repeats = @canon.get_metadata.get_repeats
+        if repeats > 1
+          repeat_string = " \\repeat volta #{ repeats } {"
+        else
+          repeat_string = " {"
+        end
+        lp = "\\new Staff \\with {\ninstrumentName = \#\"#{ instrument }\"\n}\n{\n#{ tempo_string }\\transpose #{ lilypond_key_note } #{ lilypond_key_note }#{ transpose_adjustment } {\n\\clef #{ clef }\n\\time #{ @time_sig }\n\\key #{ lilypond_key_note } \\#{ @key_sig_type.to_s }\n #{ repeat_string }"
         # Add start rests, staff number * bars per chord progression.
         one_bar_rest = (@time_sig == "3/4") ? "R2." : "R1"
         for bar in 1..(@canon.get_metadata.get_offset * staff)
           lp = lp + one_bar_rest + " "
         end
         # Add the notes.
-        @notes.map do |note|
+        @notes[0..1].map do |note|
+          lp << "#{ note } "
+        end
+        if repeats > 1 && staff == 0
+          lp << "\\mark \\markup { \\italic { Play #{ repeats } times } } "
+        end
+        @notes[2..-1].map do |note|
           lp << "#{ note } "
         end
         # Add rests to the end.
         for bar in 1..((@num_voices - 1 - staff) * @canon.get_metadata.get_offset)
           lp = lp + one_bar_rest + " "
         end
-        whole = whole + lp + "}\n}\n"
+        whole = whole + lp + "}\n}\n}\n"
       end
+      # Get rid of extra text from staves except the first.
+
       # Return the whole string, wrapped in curly braces.
       return "{\n<<\n" + whole + "\n>>\n}"
     end

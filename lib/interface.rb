@@ -19,39 +19,68 @@ end
 # RETURNS: Nil.
 define :canon_play do |canon_arg|
 
-  # ARGS: A melody (array of bars which are arrays of beats) and a value for the pan of this melody.
-  # DESCRIPTION: Plays the melody by playing each bar in turn.
-  # RETURNS: Nil.
-  define :play_melody do |melody, pan, voice, transpose|
-    use_synth voice
-    use_transpose transpose * 12
-    num_bars = melody.length
-    for i in 0..num_bars - 1
-      play_bar(melody[i], pan)
-    end
-  end
+  define :play_single_canon do |canon|
 
-  # ARGS: A bar (array of beats) and a value for the pan of this melody.
-  # DESCRIPTION: Plays the bar by playing each beat in turn.
-  # RETURNS: Nil.
-  define :play_bar do |bar, pan|
-    num_beats = bar.length
-    for i in 0..num_beats - 1
-      play_beat(bar[i], pan)
+    # ARGS: A melody (array of bars which are arrays of beats) and a value for the pan of this melody.
+    # DESCRIPTION: Plays the melody by playing each bar in turn.
+    # RETURNS: Nil.
+    define :play_melody do |melody, pan, voice, transpose|
+      use_synth voice
+      use_transpose transpose * 12
+      num_bars = melody.length
+      for i in 0..num_bars - 1
+        play_bar(melody[i], pan)
+      end
     end
-  end
 
-  # ARGS: A beat (hash with the root note, rhythm values and pitch values) and a value for the pan of this melody.
-  # DESCRIPTION: Plays the beat by playing each note in turn, specified by the array of values for rhythm and pitch.
-  # RETURNS: Nil.
-  define :play_beat do |beat, pan|
-    proportion_sustain = 0.7
-    proportion_release = 0.3
-    pairs = beat[:rhythm].zip(beat[:notes])
-    pairs.map do |pair|
-      play pair[1], attack: 0, sustain: pair[0] * proportion_sustain, release: pair[0] * proportion_release, pan: pan
-      sleep pair[0].to_f
+    # ARGS: A bar (array of beats) and a value for the pan of this melody.
+    # DESCRIPTION: Plays the bar by playing each beat in turn.
+    # RETURNS: Nil.
+    define :play_bar do |bar, pan|
+      num_beats = bar.length
+      for i in 0..num_beats - 1
+        play_beat(bar[i], pan)
+      end
     end
+
+    # ARGS: A beat (hash with the root note, rhythm values and pitch values) and a value for the pan of this melody.
+    # DESCRIPTION: Plays the beat by playing each note in turn, specified by the array of values for rhythm and pitch.
+    # RETURNS: Nil.
+    define :play_beat do |beat, pan|
+      proportion_sustain = 0.7
+      proportion_release = 0.3
+      pairs = beat[:rhythm].zip(beat[:notes])
+      pairs.map do |pair|
+        play pair[1], attack: 0, sustain: pair[0] * proportion_sustain, release: pair[0] * proportion_release, pan: pan
+        sleep pair[0].to_f
+      end
+    end
+
+    # Get the array representation of the canon from the canon object.
+    canon_internal_rep = canon.get_canon_as_array
+    # Check for an empty canon.
+    if canon_internal_rep.length == 0 || canon_internal_rep[0].length == 0
+      raise "This canon is empty"
+    else
+      # Find how many voices to play- this is the same as beats in a bar.
+      num_voices = canon.get_metadata.get_number_of_voices
+      offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_offset
+      voices = canon.get_metadata.get_sounds
+      transpositions = canon.get_metadata.get_transpositions
+      # Play the melody the correct number of times at the different offsets.
+      for voice in 0..num_voices - 1
+        in_thread do
+          pan = rand * 0.75
+          this_voice = voice
+          # Start this voice with a random pan value.
+          play_melody(canon_internal_rep, pan, voices[this_voice], transpositions[this_voice])
+        end
+        # Sleep until the next voice comes in.
+        sleep offset
+      end
+      sleep canon.get_metadata.get_number_of_bars * canon.get_metadata.get_beats_in_bar - offset
+    end
+    return canon
   end
 
   # If the argument is metadata, generate a canon from it.
@@ -62,35 +91,10 @@ define :canon_play do |canon_arg|
   else
     raise "Wrong argument type for canon_play: #{ metadata.class }."
   end
-  # Get the array representation of the canon from the canon object.
-  canon_internal_rep = canon.get_canon_as_array
-  # Check for an empty canon.
-  if canon_internal_rep.length == 0 || canon_internal_rep[0].length == 0
-    raise "This canon is empty"
-  else
-    # Find how many voices to play- this is the same as beats in a bar.
-    num_voices = canon.get_metadata.get_number_of_voices
-    num_repeats = canon.get_metadata.get_repeats
-    offset = canon.get_metadata.get_beats_in_bar * canon.get_metadata.get_offset
-    voices = canon.get_metadata.get_sounds
-    transpositions = canon.get_metadata.get_transpositions
-    # Play the melody the correct number of times at the different offsets.
-    for voice in 0..num_voices - 1
-      in_thread do
-        pan = rand * 0.75
-        this_voice = voice
-        for repeat in 0..num_repeats - 1
-          # Start this voice with a random pan value.
-          play_melody(canon_internal_rep, pan, voices[this_voice], transpositions[this_voice])
-        end
-      end
-      # Sleep until the next voice comes in, unless it is the last voice in which case sleep until the end.
-      if voice == num_voices - 1
-        sleep canon.get_metadata.get_number_of_bars * canon.get_metadata.get_beats_in_bar * num_repeats
-      else
-        sleep offset
-      end
-    end
+  # For each repeat, play the canon.
+  num_repeats = canon.get_metadata.get_repeats
+  for i in 1..num_repeats
+    play_single_canon(canon)
   end
   return canon
 end
